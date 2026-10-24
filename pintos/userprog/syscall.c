@@ -204,7 +204,21 @@ read (int fd, void *buffer, unsigned size) {
 	if (size == 0) {
 		return 0;
 	}
+
+	//# 버퍼의 모든 페이지가 매핑되어 있는지 검사.
 	range_chk(buffer, buffer + size);
+
+	//# 각 페이지가 쓰기 가능한지 검사
+	uintptr_t last = (uintptr_t) buffer + size -1;
+
+	for (uintptr_t page_addr = (uintptr_t) pg_round_down (buffer);
+			page_addr <= (uintptr_t) pg_round_down ((void *) last);
+			page_addr += PGSIZE) {
+		uint64_t *pte =
+			pml4e_walk (curr->pml4, page_addr, 0);
+		if (pte == NULL || !is_writable (pte))
+			exit (-1);
+	}
 
 	//# fd0 키보드에서 읽기
 	if (fd == 0) {
