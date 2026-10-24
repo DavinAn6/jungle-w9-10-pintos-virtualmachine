@@ -322,11 +322,16 @@ thread_yield (void) {
 
 void
 thread_yield_if_preempted(void) {
+	enum intr_level old_level = intr_disable ();
+	bool yield = false;
+
     if (!list_empty(&ready_list)) {
         struct thread *next = list_entry(list_front(&ready_list), struct thread, elem);
         if (next->priority > thread_current()->priority)
-            thread_yield();
+            yield = true;
     }
+	intr_set_level (old_level);
+	if (yield) {thread_yield();}
 }
 
 
