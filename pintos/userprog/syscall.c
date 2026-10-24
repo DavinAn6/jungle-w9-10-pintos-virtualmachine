@@ -286,7 +286,7 @@ seek (int fd, unsigned position) {
 static unsigned
 tell (int fd) {
 	struct thread *t = thread_current();
-	if (fd <2 || fd >= 128 || t->file_p[fd] == NULL){
+	if (fd < FD_START || fd >= FD_MAX || t->file_p[fd] == NULL){
 		return -1;
 	}
 
