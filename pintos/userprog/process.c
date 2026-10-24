@@ -7,6 +7,7 @@
 #include <string.h>
 #include "userprog/gdt.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -83,6 +84,8 @@ process_create_initd (const char *file_name) {
 	args->cs = cs;
 	args->fn_copy = fn_copy;
 
+	cs->ref_cnt = 2;
+
 	char file_name_cpy[THREAD_NAME_MAX];
 	strlcpy (file_name_cpy, file_name, THREAD_NAME_MAX);
 	char *file_name_tkn, *save_ptr;
@@ -148,6 +151,7 @@ process_fork (const char *name, struct intr_frame *if_) {
 	sema_init(&cs->fork_sema, 0);
 	cs->exit_status = -1;
 	cs->fork_success = false;	
+	cs->ref_cnt = 2;
 
 	struct job_args *ja = malloc(sizeof *ja);
 	if (ja == NULL) {
@@ -191,6 +195,21 @@ process_fork (const char *name, struct intr_frame *if_) {
 
 	return tid;
 
+}
+
+static void
+child_status_release (struct child_status *cs) {
+	enum intr_level old_level;
+	old_level = intr_disable ();
+
+	cs->ref_cnt -= 1;
+	bool should_free = cs->ref_cnt == 0;
+
+	intr_set_level (old_level);
+
+	if (should_free == true) {
+		free (cs);
+	}
 }
 
 #ifndef VM
@@ -393,8 +412,8 @@ process_wait (tid_t child_tid) {
 	// list에서 지워주고
 	list_remove(&child->child_elem);
 
-	// free
-	free(child);
+	// release
+	child_status_release (child);
 
 	return exit_status;
 }
@@ -432,6 +451,14 @@ process_exit (void) {
 		curr->self_status->exit_status = curr->exit_status;
 		// 기다리던 부모 깨우기
 		sema_up(&curr->self_status->wait_sema);
+		// 참조 release
+		child_status_release (curr->self_status);
+	}
+
+	while (!list_empty(&curr->child_list)) {
+		struct list_elem *e = list_pop_front (&curr->child_list);
+		struct child_status *cs = list_entry(e, struct child_status, child_elem);
+		child_status_release (cs);
 	}
 }
 	

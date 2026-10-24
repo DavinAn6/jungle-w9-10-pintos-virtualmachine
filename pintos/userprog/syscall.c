@@ -17,6 +17,7 @@
 #include "include/threads/synch.h"
 #include "filesys/filesys.h"
 #include "filesys/off_t.h"
+#include "devices/input.h"
 
 
 void syscall_entry (void);
@@ -81,10 +82,32 @@ range_chk (void *args, void *end_args){
 	}
 }
 
+/* 문자열 전용 함수
+   1. 첫 바이트를 읽기 전에 검증
+   2. NUL 문자까지 문자열 전체 순회
+   3. 페이지 경계에 도달할 때마다 새 페이지 검증
+   4. 다음 페이지가 매핑되지 않았다면 역참조 전에 exit(-1) */
+
+static void
+string_chk (const char *str) {
+	const char *p = str;
+
+	for (;;) {
+		/* 첫 바이트와 새로운 페이지의 첫 바이트를 역참조하기 전에 검사한다. */
+		if (p == str || pg_ofs (p) == 0)
+			range_chk ((void *) p, NULL);
+
+		if (*p == '\0')
+			return;
+
+		p++;
+	}
+}
+
 static pid_t
 fork (const char *thread_name, struct intr_frame *f){
 	// 1) thread_name 주소 검사
-	range_chk(thread_name, NULL);
+	string_chk(thread_name);
 
 	// 2) process_fork 호출 및 반환
 	return process_fork(thread_name, f);
@@ -93,7 +116,7 @@ fork (const char *thread_name, struct intr_frame *f){
 
 static int
 exec (const char *file) {
-	range_chk(file, NULL);
+	string_chk(file);
 
 	// /* 파일 이름 보존 위해 palloc 으로 할당 (process_cleanup 에서 사라지지 않게 하기 위해)*/
 	// char *file_name = palloc_get_page(0);
@@ -105,6 +128,7 @@ exec (const char *file) {
 	if (rtn == -1) {
 		exit(-1);
 	}
+	return rtn;
 }
 
 static int
@@ -114,7 +138,7 @@ wait (pid_t pid) {
 
 static bool
 create (const char *file, unsigned initial_size) {
-	range_chk(file, NULL);					//# 포인터 유효성 검증
+	string_chk(file);					//# 포인터 유효성 검증
 	lock_acquire(&file_lock);				//# 파일시스템 락 설정
 
 	bool result = filesys_create(file, initial_size);  //# 파일 생성
@@ -124,7 +148,7 @@ create (const char *file, unsigned initial_size) {
 
 static bool
 remove (const char *file) {
-	range_chk(file, NULL);
+	string_chk(file);
 	lock_acquire(&file_lock);
 	bool result = filesys_remove(file);
 	lock_release(&file_lock);
@@ -133,7 +157,7 @@ remove (const char *file) {
 
 static int
 open (const char *file) {
-	range_chk(file, NULL);
+	string_chk(file);
 
 	// 파일 오픈
 	lock_acquire(&file_lock);
@@ -182,7 +206,21 @@ read (int fd, void *buffer, unsigned size) {
 	if (size == 0) {
 		return 0;
 	}
+
+	//# 버퍼의 모든 페이지가 매핑되어 있는지 검사.
 	range_chk(buffer, buffer + size);
+
+	//# 각 페이지가 쓰기 가능한지 검사
+	uintptr_t last = (uintptr_t) buffer + size -1;
+
+	for (uintptr_t page_addr = (uintptr_t) pg_round_down (buffer);
+			page_addr <= (uintptr_t) pg_round_down ((void *) last);
+			page_addr += PGSIZE) {
+		uint64_t *pte =
+			pml4e_walk (curr->pml4, page_addr, 0);
+		if (pte == NULL || !is_writable (pte))
+			exit (-1);
+	}
 
 	//# fd0 키보드에서 읽기
 	if (fd == 0) {
@@ -250,7 +288,7 @@ seek (int fd, unsigned position) {
 static unsigned
 tell (int fd) {
 	struct thread *t = thread_current();
-	if (fd <2 || fd >= 128 || t->file_p[fd] == NULL){
+	if (fd < FD_START || fd >= FD_MAX || t->file_p[fd] == NULL){
 		return -1;
 	}
 
