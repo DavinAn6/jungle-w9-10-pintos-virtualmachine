@@ -133,6 +133,7 @@ struct thread {
 // 자식 thread 
 struct child_status {
 	int exit_status;
+	int ref_cnt;
 	pid_t child_pid;
 	struct list_elem child_elem;
 	struct semaphore wait_sema;
