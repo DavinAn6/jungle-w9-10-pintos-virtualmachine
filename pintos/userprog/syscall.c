@@ -17,6 +17,7 @@
 #include "include/threads/synch.h"
 #include "filesys/filesys.h"
 #include "filesys/off_t.h"
+#include "devices/input.h"
 
 
 void syscall_entry (void);
@@ -127,6 +128,7 @@ exec (const char *file) {
 	if (rtn == -1) {
 		exit(-1);
 	}
+	return rtn;
 }
 
 static int
