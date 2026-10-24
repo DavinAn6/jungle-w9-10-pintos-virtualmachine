@@ -4,6 +4,22 @@
 #include "vm/vm.h"
 #include "vm/inspect.h"
 
+/* hash_init()에 인자로 줄 key의 hash값 계산 및 비교 함수
+   각각 page_hash(), page_less() */
+
+static uint64_t page_hash (const struct hash_elem *e_, void *aux UNUSED) {
+	const struct page *page = hash_entry(e_, struct page, spt_elem);
+	return hash_bytes(&page->va, sizeof(page->va));
+}
+
+static bool page_less (const struct hash_elem *a_,
+					   const struct hash_elem *b_, void *aux UNUSED) {
+	const struct page *a = hash_entry(a_, struct page, spt_elem);
+	const struct page *b = hash_entry(b_, struct page, spt_elem);
+
+	return a->va < b->va;
+}
+
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 void
@@ -172,8 +188,19 @@ vm_do_claim_page (struct page *page) {
 }
 
 /* Initialize new supplemental page table */
+/* spt->pages를 비어 있는 해시 테이블로 초기화 */
 void
-supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+supplemental_page_table_init (struct supplemental_page_table *spt) {
+
+	/* hash_init이 매개변수로 받는 변수들은
+	   초기화 할 해시 테이블,
+	   key의 hash 값을 계산할 함수(page_hash())
+	   두 key를 비교할 함수(page_less())
+	   callback에 전달할 추가 정보(일단 aux)
+	   
+	   따라서 함수 두개 static으로 만드는게 선행 됨.  */
+	hash_init(&spt->pages, page_hash, page_less, NULL);
+
 }
 
 /* Copy supplemental page table from src to dst */
