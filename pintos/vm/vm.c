@@ -66,11 +66,15 @@ err:
 
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
-spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
-	struct page *page = NULL;
-	/* TODO: Fill this function. */
-
-	return page;
+spt_find_page (struct supplemental_page_table *spt, void *va) {
+	struct page page;
+	page.va = pg_round_down(va);	//# va가 포함된 페이지로
+	struct hash_elem *he = hash_find(&spt->pages, &page.hash_elem);
+	if (he != NULL) {
+		return hash_entry(he, struct page, hash_elem); //# hash_elem 이 포함된 페이지
+	} else {
+		return NULL;
+	}
 }
 
 /* Insert PAGE into spt with validation. */
