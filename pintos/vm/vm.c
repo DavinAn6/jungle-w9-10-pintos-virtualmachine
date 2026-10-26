@@ -169,12 +169,13 @@ vm_dealloc_page (struct page *page) {
 }
 
 /* Claim the page that allocate on VA. */
+//# SPT에서 VA를 갖고 있는 페이지를 찾아서 do_claim 호출
 bool
-vm_claim_page (void *va UNUSED) {
-	struct page *page = NULL;
-	/* TODO: Fill this function */
-
-	return vm_do_claim_page (page);
+vm_claim_page (void *va) {
+	//# 현재 스레드에서 SPT 참조
+	struct page *page = spt_find_page(&(thread_current()->spt), va);
+	//# SPT에 VA가 없어서 페이지가 NULL로 반환될 경우는 false 반환해야함 -> do_claim에서 해줄 것
+	return vm_do_claim_page (page); 
 }
 
 /* Claim the PAGE and set up the mmu. */
