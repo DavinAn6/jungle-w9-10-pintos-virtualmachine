@@ -43,6 +43,8 @@ uninit_new (struct page *page, void *va, vm_initializer *init,
 }
 
 /* Initalize the page on first fault */
+/* VM_UNINIT page를 최종 타입인 VM_ANON 또는 VM_FILE로 전환하고,
+   필요하면 lazy-loading callback을 실행하는 것*/
 static bool
 uninit_initialize (struct page *page, void *kva) {
 	struct uninit_page *uninit = &page->uninit;

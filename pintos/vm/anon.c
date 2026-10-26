@@ -31,6 +31,15 @@ anon_initializer (struct page *page, enum vm_type type, void *kva) {
 	page->operations = &anon_ops;
 
 	struct anon_page *anon_page = &page->anon;
+
+	/* 추가할지도 모를 사항들
+	   1. anon page용 메타데이터 동적 할당 실패시
+	   2. 잘못된 page_type 전달시
+	   3. swap 관련 초기 상태 구성 실패시
+	   4. 추가 자원 초기화 실패시
+	   이 조건에서는 false 반환하게 됨*/
+
+	return true;
 }
 
 /* Swap in the page by read contents from the swap disk. */
