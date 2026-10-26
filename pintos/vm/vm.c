@@ -3,6 +3,7 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
+#include "threads/mmu.h"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -225,15 +226,32 @@ vm_dealloc_page (struct page *page) {
 }
 
 /* Claim the page that allocate on VA. */
+/* VA를 받는 외부용 함수 (그래서 static이 아닌갑다)
+   현재 thread의 SPT에서 struct page를 검색
+   그렇게 찾은 page를 vm_do_claim_page(page) 호출 
+   
+   로직:
+   현재 thread의 SPT 가져오기
+   spt_find_page(spt, va)
+   page가 없으면 false
+   있으면 vm_do_claim_page(page) */
 bool
-vm_claim_page (void *va UNUSED) {
+vm_claim_page (void *va) {
 	struct page *page = NULL;
-	/* TODO: Fill this function */
+
+	page = spt_find_page(&thread_current()->spt, va);
+	if (page == NULL) {
+		return false;
+	}
 
 	return vm_do_claim_page (page);
 }
 
 /* Claim the PAGE and set up the mmu. */
+/* frame 확보
+   page와 frame을 연결
+   PML4에 VA -> kva 매핑
+   swap_in()으로 page 내용 준비 */
 static bool
 vm_do_claim_page (struct page *page) {
 	struct frame *frame = vm_get_frame ();
@@ -243,7 +261,15 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
+	if(!pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable)) {
+		frame->page = NULL;
+		page->frame = NULL;
+		palloc_free_page(frame->kva);
+		free(frame);
 
+		return false;
+	}
+	
 	return swap_in (page, frame->kva);
 }
 
