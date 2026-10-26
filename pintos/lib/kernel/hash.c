@@ -6,6 +6,7 @@
    See hash.h for basic information. */
 
 #include "hash.h"
+#include "include/vm/vm.h"
 #include "../debug.h"
 #include "threads/malloc.h"
 
@@ -18,6 +19,22 @@ static struct hash_elem *find_elem (struct hash *, struct list *,
 static void insert_elem (struct hash *, struct list *, struct hash_elem *);
 static void remove_elem (struct hash *, struct hash_elem *);
 static void rehash (struct hash *);
+
+uint64_t
+page_hash (const struct hash_elem *p_, void *aux) {
+  const struct page *p = hash_entry (p_, struct page, hash_elem);
+  return hash_bytes (&p->va, sizeof p->va);
+}
+
+
+bool 
+page_less (const struct hash_elem *a_,
+           const struct hash_elem *b_, void *aux) {
+  const struct page *a = hash_entry (a_, struct page, hash_elem);
+  const struct page *b = hash_entry (b_, struct page, hash_elem);
+
+  return a->va < b->va;
+}
 
 /* Initializes hash table H to compute hash values using HASH and
    compare hash elements using LESS, given auxiliary data AUX. */
