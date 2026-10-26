@@ -179,15 +179,28 @@ vm_claim_page (void *va) {
 }
 
 /* Claim the PAGE and set up the mmu. */
+//# vm_claim_page 또는 vm_try_handle_fault에서 전달해준 페이지와 프레임을 연결하고 Page Table(pml4)에 등록
 static bool
 vm_do_claim_page (struct page *page) {
+	//# Page NULL check
+	if (page ==  NULL) {
+		return false;
+	}
+
 	struct frame *frame = vm_get_frame ();
 
 	/* Set links */
 	frame->page = page;
 	page->frame = frame;
 
-	/* TODO: Insert page table entry to map page's VA to frame's PA. */
+	//# 인자로 전달된 페이지를 vm_get_frame으로 생긴 프레임으로 매핑되도록 페이지 테이블 등록
+	if (!pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable)) {
+		//# 매핑이 실패해서 자원 해제
+		free(frame->kva);
+		free(frame);
+		page->frame = NULL;
+		return false;
+	}
 
 	return swap_in (page, frame->kva);
 }
