@@ -158,12 +158,38 @@ vm_evict_frame (void) {
  * and return it. This always return valid address. That is, if the user pool
  * memory is full, this function evicts the frame to get the available memory
  * space.*/
+/* 이 함수는 암튼 무조건 get frame함. 유저 풀 메모리에 자리가 없으면 eviction 하고 
+   get frame 해야 한다는 소리 -> 실패 시 NULL 반환 이런거 안 함
+   why? 물리 메모리가 찼다는 이유만으로 NULL을 반환하면,
+   해결 가능한 page fault인데도 프로세스를 종료하게 되기 때문에 eviction이 필요.
+   
+   로직:
+   1. user pool에서 물리 페이지 확보 시도
+   2. 성공하면 해당 물리 페이지를 관리할 struct frame 생성
+   3. frame을 아직 어떤 page에도 연결되지 않은 상태로 초기화
+   4. 물리 페이지 확보 실패 시 기존 frame을 eviction 해서 재사용
+   5. 사용 가능한 frame 반환  */
 static struct frame *
 vm_get_frame (void) {
 	struct frame *frame = NULL;
-	/* TODO: Fill this function. */
+	void *kva;
+
+	kva = palloc_get_page(PAL_USER);
+	if (kva != NULL) {
+		frame = malloc(sizeof(*frame));
+		/* user pool이 아니라 kernel heap의 메모리가 부족한 상황 */
+		if (frame == NULL) {
+			palloc_free_page(kva);
+			PANIC ("Failed to allocate frame metadata");
+		}
+		frame->kva = kva;
+	}
+	else {
+		frame = vm_evict_frame(); //evict 함수 아직 미완성이라 나중에 해야함
+	}
 
 	ASSERT (frame != NULL);
+	frame->page = NULL;
 	ASSERT (frame->page == NULL);
 	return frame;
 }
