@@ -48,7 +48,7 @@ static struct frame *vm_evict_frame (void);
    1. 같은 VA의 page가 SPT에 있는지 확인
    2. struct page 메모리 할당
    3. type에 맞는 page initializer 선택
-   4. uninint_new()로 VM_UNINIT page 구성
+   4. uninit_new()로 VM_UNINIT page 구성
    5. writable 정보 저장
    6. SPT에 삽입
    7. 실패하면 할당한 자원 정리  */
@@ -63,29 +63,35 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 	bool (*initializer)(struct page *, enum vm_type, void *);
 
 	/* Check wheter the upage is already occupied or not. */
-	if (spt_find_page (spt, upage) == NULL) {
-
-		page = malloc(sizeof(*page));
-		if (page == NULL) {
-			goto err;
-		}
-
-		if (VM_TYPE(type) == VM_ANON) {
-			initializer = anon_initializer;
-		}
-		else if (VM_TYPE(type) == VM_FILE) {
-			initializer = file_backed_initializer;
-		}
-
-		uninit_new(page, upage, init, type, aux, initializer);
-		page->writable = writable;
-
-		if (!spt_insert_page(spt, page)) {
-			free(page);
-			goto err;
-		}
-		return true;
+	if (spt_find_page (spt, upage) != NULL) {
+		goto err;
 	}
+
+	page = malloc(sizeof(*page));
+	if (page == NULL) {
+		goto err;
+	}
+
+	if (VM_TYPE(type) == VM_ANON) {
+		initializer = anon_initializer;
+	}
+	else if (VM_TYPE(type) == VM_FILE) {
+		initializer = file_backed_initializer;
+	}
+	else {
+		free(page);
+		goto err;
+	}
+
+	uninit_new(page, upage, init, type, aux, initializer);
+	page->writable = writable;
+
+	if (!spt_insert_page(spt, page)) {
+		free(page);
+		goto err;
+	}
+	return true;
+
 err:
 	return false;
 }
@@ -260,7 +266,6 @@ vm_do_claim_page (struct page *page) {
 	frame->page = page;
 	page->frame = frame;
 
-	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	if(!pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable)) {
 		frame->page = NULL;
 		page->frame = NULL;
@@ -270,7 +275,26 @@ vm_do_claim_page (struct page *page) {
 		return false;
 	}
 	
-	return swap_in (page, frame->kva);
+	/* lazy loading 중 파일 내용을 제대로 읽지 못한 경우 edge case 처리
+	   ex) lazy_load_segment() 시,
+	   		실행 파일에서 요청한 바이트 수만큼 읽지 못함
+			잘못된 file/offeset 정보
+			lazy initializer 자체가 실패
+			타입별 page initializer가 실패 
+			
+			이 처리를 안하면,
+			pml4 매핑은 했고,
+			frame도 있는데,
+			page에 데이터는 이상한 데이터라 메모리 누수*/
+	if (!swap_in (page, frame->kva)){
+		pml4_clear_page(thread_current()->pml4, page->va);
+		frame->page = NULL;
+		page->frame = NULL;
+		palloc_free_page(frame->kva);
+		free(frame);
+		return false;
+	}
+	return true;
 }
 
 /* hash_init()에 인자로 줄 key의 hash값 계산 및 비교 함수
