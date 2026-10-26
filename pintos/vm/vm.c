@@ -119,11 +119,22 @@ vm_evict_frame (void) {
  * space.*/
 static struct frame *
 vm_get_frame (void) {
-	struct frame *frame = NULL;
-	/* TODO: Fill this function. */
+	//# 프레임 구조체 선언. 페이지 할당까지는 필요없어서 malloc 사용
+	struct frame *frame = malloc(sizeof(struct frame));	
 
+	//# User pool에서 프레임 하나 확보. kva가 void*라서 void*로 선언
+	void *p = palloc_get_page(PAL_USER);				
+
+	//# User pool 소진되었을 경우. Eviction은 아직 미구현
+	if (p == NULL) {
+		free(frame);	//# p가 null일 경우, 프레임은 해제								
+		PANIC ("todo");
+	}
 	ASSERT (frame != NULL);
+	frame->kva = p;
+	frame->page = NULL;	//# 아직 페이지 연결은 안됨. vm_do_claim_page에서 진행
 	ASSERT (frame->page == NULL);
+
 	return frame;
 }
 
