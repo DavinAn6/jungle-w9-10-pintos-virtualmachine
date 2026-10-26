@@ -67,7 +67,7 @@ struct page {
 /* The representation of "frame" */
 struct frame {
 	void *kva;			
-	struct page *page;	//# 소속된 페이지 구조체
+	struct page *page;
 };
 
 /* The function table for page operations.

@@ -68,10 +68,12 @@ err:
 struct page *
 spt_find_page (struct supplemental_page_table *spt, void *va) {
 	struct page page;
-	page.va = pg_round_down(va);	//# va가 포함된 페이지로
+	/* va가 포함된 페이지로 주소 전환 */
+	page.va = pg_round_down(va);
 	struct hash_elem *he = hash_find(&spt->pages, &page.hash_elem);
 	if (he != NULL) {
-		return hash_entry(he, struct page, hash_elem); //# hash_elem 이 포함된 페이지
+		/* hash_elem 이 포함된 페이지 반환 */
+		return hash_entry(he, struct page, hash_elem);
 	} else {
 		return NULL;
 	}
@@ -119,20 +121,22 @@ vm_evict_frame (void) {
  * space.*/
 static struct frame *
 vm_get_frame (void) {
-	//# 프레임 구조체 선언. 페이지 할당까지는 필요없어서 malloc 사용
+	/* 프레임 구조체 선언. 페이지 할당까지는 필요없어서 malloc 사용 */
 	struct frame *frame = malloc(sizeof(struct frame));	
 
-	//# User pool에서 프레임 하나 확보. kva가 void*라서 void*로 선언
+	/* User pool에서 프레임 하나 확보. kva가 void*라서 void*로 선언 */
 	void *p = palloc_get_page(PAL_USER);				
 
-	//# User pool 소진되었을 경우. Eviction은 아직 미구현
+	/* User pool 소진되었을 경우. Eviction은 아직 미구현 */
 	if (p == NULL) {
-		free(frame);	//# p가 null일 경우, 프레임은 해제								
+		/* p가 null일 경우, 프레임은 해제 */
+		free(frame);								
 		PANIC ("todo");
 	}
 	ASSERT (frame != NULL);
 	frame->kva = p;
-	frame->page = NULL;	//# 아직 페이지 연결은 안됨. vm_do_claim_page에서 진행
+	/* 아직 페이지 연결은 안됨. vm_do_claim_page에서 진행 */
+	frame->page = NULL;
 	ASSERT (frame->page == NULL);
 
 	return frame;
@@ -168,21 +172,23 @@ vm_dealloc_page (struct page *page) {
 	free (page);
 }
 
-/* Claim the page that allocate on VA. */
-//# SPT에서 VA를 갖고 있는 페이지를 찾아서 do_claim 호출
+/* Claim the page that allocate on VA. 
+ * SPT에서 VA를 갖고 있는 페이지를 찾아서 do_claim 호출
+ */
 bool
 vm_claim_page (void *va) {
-	//# 현재 스레드에서 SPT 참조
+	/* 현재 스레드에서 SPT 참조 */
 	struct page *page = spt_find_page(&(thread_current()->spt), va);
-	//# SPT에 VA가 없어서 페이지가 NULL로 반환될 경우는 false 반환해야함 -> do_claim에서 해줄 것
+	/* SPT에 VA가 없어서 페이지가 NULL로 반환될 경우는 false 반환해야함 -> do_claim에서 해줄 것 */
 	return vm_do_claim_page (page); 
 }
 
-/* Claim the PAGE and set up the mmu. */
-//# vm_claim_page 또는 vm_try_handle_fault에서 전달해준 페이지와 프레임을 연결하고 Page Table(pml4)에 등록
+/* Claim the PAGE and set up the mmu. 
+ * vm_claim_page 또는 vm_try_handle_fault에서 전달해준 페이지와 프레임을 연결하고 Page Table(pml4)에 등록
+*/
 static bool
 vm_do_claim_page (struct page *page) {
-	//# Page NULL check
+	/* Page NULL check */
 	if (page ==  NULL) {
 		return false;
 	}
@@ -193,9 +199,9 @@ vm_do_claim_page (struct page *page) {
 	frame->page = page;
 	page->frame = frame;
 
-	//# 인자로 전달된 페이지를 vm_get_frame으로 생긴 프레임으로 매핑되도록 페이지 테이블 등록
+	/* 인자로 전달된 페이지를 vm_get_frame으로 생긴 프레임으로 매핑되도록 페이지 테이블 등록 */
 	if (!pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable)) {
-		//# 매핑이 실패해서 자원 해제
+		/* 매핑이 실패해서 자원 해제 */
 		free(frame->kva);
 		free(frame);
 		page->frame = NULL;

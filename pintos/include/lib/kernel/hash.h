@@ -71,7 +71,7 @@ struct hash_iterator {
 	struct hash_elem *elem;     /* Current hash element in current bucket. */
 };
 
-//# 해시 함수 추가
+/* 해시 함수 추가 */
 uint64_t page_hash (const struct hash_elem *p_, void *aux);
 bool page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux);
 
