@@ -129,7 +129,16 @@ vm_evict_frame (void) {
 static struct frame *
 vm_get_frame (void) {
 	struct frame *frame = NULL;
-	/* TODO: Fill this function. */
+	/* TODO: Fill this function. */ 
+	void *kva = palloc_get_page (PAL_USER);
+
+	if (kva == NULL) {
+		PANIC ("todo");
+	}
+
+	frame = malloc (sizeof *frame);
+	frame->kva = kva;
+	frame->page = NULL;
 
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
