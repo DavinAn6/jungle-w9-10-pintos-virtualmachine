@@ -945,10 +945,20 @@ setup_stack (struct intr_frame *if_) {
 	bool success = false;
 	void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
 
-	/* TODO: Map the stack on stack_bottom and claim the page immediately.
-	 * TODO: If success, set the rsp accordingly.
-	 * TODO: You should mark the page is stack. */
-	/* TODO: Your code goes here */
+
+	/* VM_ANON의 종류 중 stack page임을 표시해주기 위해 VM_MARKER_0 정보 추가 */
+	if (!vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, true)) {
+		return success;
+	}
+
+	if (!vm_claim_page(stack_bottom)) {
+		return success;
+	}
+
+	/* alloc 성공, claim 실패 시 stack page는 SPT에 등록된 채로 남아 있는데,
+	   supplemental_page_table_kill()이 정리하도록 설계해야 함. */
+	if_->rsp = USER_STACK;
+	success = true;
 
 	return success;
 }

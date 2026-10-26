@@ -86,6 +86,8 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 	uninit_new(page, upage, init, type, aux, initializer);
 	page->writable = writable;
 
+	/* 같은 VA를 가진 page가 이미 spt에 존재하는 경우 삽입 실패 edge case 처리
+	   중복 삽입을 방지 하는 방어코드 사실 쓸 데 없을지도 모름 */
 	if (!spt_insert_page(spt, page)) {
 		free(page);
 		goto err;
