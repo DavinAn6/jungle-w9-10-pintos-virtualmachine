@@ -197,6 +197,9 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	if (!pml4_set_page (thread_current ()->pml4, page->va, frame->kva, page->writable)) {
+		palloc_free_page (frame->kva);
+		free (frame);
+		page->frame = NULL;
 		return false;
 	}
 	return swap_in (page, frame->kva);
