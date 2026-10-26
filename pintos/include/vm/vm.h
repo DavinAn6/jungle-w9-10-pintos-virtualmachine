@@ -47,9 +47,8 @@ struct page {
 	struct frame *frame;   /* Back reference for frame */
 
 	/* Your implementation */
-	struct hash_elem spt_elem; /* 페이지를 SPT 해시 테이블에 연결하는 요소 */
-	bool writable; /* 페이지의 쓰기 가능 여부 lazy loading에서는
-					  등록과 매핑 시점이 다르기 때문에 별도로 보관하기 위해 추가 */
+	struct hash_elem hash_elem;
+	bool writable;
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -88,24 +87,8 @@ struct page_operations {
 /* Representation of current process's memory space.
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
-/* 페이지 단위로 관리할 것이기 때문에 fault 주소를 받아도 시작 주소로 내린다
-   pg_round_down() 따라서 page-alinged va가 되므로 page에 이미 존재하는 va값이
-   키 역할을 함.
-
-   해시 테이블이 적절한 이유:
-   Pintos의 hash는 일반 라이브러리처럼 key/value를 직접 넣는 방식이 아니라,
-   저장할 구조체 안에 struct hash_elem을 포함하는 intrusive hash 방식
-   
-   supplemental_page_table
-	└─ struct hash
-    	  └─ struct hash_elem
-        	     └─ struct page
-            	        └─ va
-
-	따라서 spt에는 hash table만 추가하고,
-	struct page에 hash_elem을 추가하는 작업이 필요 */
 struct supplemental_page_table {
-	struct hash pages; /* 가상 주소를 기준으로 페이지를 관리하는 해시 테이블 */
+	struct hash pages;
 };
 
 #include "threads/thread.h"
