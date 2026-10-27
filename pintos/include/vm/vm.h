@@ -62,6 +62,12 @@ struct page {
 	};
 };
 
+struct lazy_load_arg {
+	struct file *file;
+	off_t size;
+	off_t start;
+};
+
 /* The representation of "frame" */
 struct frame {
 	void *kva;

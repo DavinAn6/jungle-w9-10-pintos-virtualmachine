@@ -892,11 +892,16 @@ install_page (void *upage, void *kpage, bool writable) {
 
 static bool
 lazy_load_segment (struct page *page, void *aux) {
-	/* TODO: Load the segment from the file */
-	/* TODO: This called when the first page fault occurs on address VA. */
-	/* TODO: VA is available when calling this function. */
-}
+	struct lazy_load_arg *arg = aux;
 
+	if (file_read_at (arg->file, page->frame->kva, arg->size, arg->start) != arg->size) {
+		free (arg);
+		return false;
+	}
+	memset ((uint8_t *) page->frame->kva + arg->size, 0, PGSIZE - arg->size);
+	free (arg);
+	return true;
+}
 /* Loads a segment starting at offset OFS in FILE at address
  * UPAGE.  In total, READ_BYTES + ZERO_BYTES bytes of virtual
  * memory are initialized, as follows:
