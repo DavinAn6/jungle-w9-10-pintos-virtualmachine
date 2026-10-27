@@ -127,8 +127,9 @@ spt_insert_page (struct supplemental_page_table *spt, struct page *page) {
 
 void
 spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
+	hash_delete (&spt->pages, &page->hash_elem);
 	vm_dealloc_page (page);
-	return true;
+	// return true; 반환형이 void인데 기본 주어진 코드는 true 반환. 왜?
 }
 
 /* Get the struct frame, that will be evicted. */
