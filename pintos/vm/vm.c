@@ -70,6 +70,8 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		goto err;
 	}
 
+	/* 여기서 할당하는 것은 실제 4kb 물리 페이지가 아니라, 페이지 정보를 기록하는 메타 데이터
+	   struct page이기 때문 */
 	page = malloc(sizeof(*page));
 	if (page == NULL) {
 		goto err;
