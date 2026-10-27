@@ -58,20 +58,42 @@ page_less (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSE
 bool
 vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		vm_initializer *init, void *aux) {
-
 	ASSERT (VM_TYPE(type) != VM_UNINIT)
-
+	/* 현재스레드 주소 등록-프로세스의 spt에 page를 등록 */
 	struct supplemental_page_table *spt = &thread_current ()->spt;
 
 	/* Check wheter the upage is already occupied or not. */
 	if (spt_find_page (spt, upage) == NULL) {
-		/* TODO: Create the page, fetch the initialier according to the VM type,
-		 * TODO: and then create "uninit" page struct by calling uninit_new. You
-		 * TODO: should modify the field after calling the uninit_new. */
+		/* 힙에 struct page 잡고 해당주소 page에 할당 */
+		struct page *page = malloc (sizeof (struct page));
 
-		/* TODO: Insert the page into the spt. */
+		if (page == NULL) {
+			return false;
+		}
+		/* 함수 포인터(initializer 분기 후 uninit 인자에 넘김) */
+		bool (*initializer) (struct page *, enum vm_type, void *);
+		switch (VM_TYPE (type)) {
+			case VM_ANON:
+				initializer = anon_initializer;
+				break;
+
+			case VM_FILE:
+				initializer = file_backed_initializer;
+				break;
+
+			default:
+				free (page);
+				return false;
+		}
+		uninit_new(page, upage, init, type, aux, initializer);
+		page->writable = writable;
+
+		if (!spt_insert_page(spt, page)) {
+			free (page);
+			return false;
+		}
+		return true;
 	}
-err:
 	return false;
 }
 
