@@ -5,6 +5,7 @@
 #include "vm/inspect.h"
 #include "hash.h"
 #include "threads/vaddr.h"
+#include <string.h>
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -260,14 +261,71 @@ supplemental_page_table_init (struct supplemental_page_table *spt) {
 
 /* Copy supplemental page table from src to dst */
 bool
-supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
-		struct supplemental_page_table *src UNUSED) {
+supplemental_page_table_copy (struct supplemental_page_table *dst,
+		struct supplemental_page_table *src) {
+	struct hash_iterator iterator;
+	struct hash_elem *e;
+	struct page *src_page;
+
+	hash_first (&iterator, &src->pages);
+	e = hash_next (&iterator);
+	
+	while (e != NULL) {
+		src_page = hash_entry (e, struct page, hash_elem);		
+		e = hash_next (&iterator);
+
+		if (src_page->operations->type == VM_UNINIT) {
+			struct lazy_load_info *info;
+			struct lazy_load_info *src_info;
+
+			src_info = (struct lazy_load_info *) src_page->uninit.aux;
+
+			if (src_info == NULL) {
+				if (!vm_alloc_page_with_initializer (src_page->uninit.type, src_page->va, src_page->writable, src_page->uninit.init, NULL)) {
+					return false;
+				}
+				continue;
+			}
+
+			info = malloc (sizeof(*info));
+			if (info == NULL) {
+				return false;
+			}
+			
+			info->file = src_info->file;
+			info->ofs = src_info->ofs;
+			info->page_read_bytes = src_info->page_read_bytes;
+			info->page_zero_bytes = src_info->page_zero_bytes;
+
+			if (!vm_alloc_page_with_initializer (src_page->uninit.type, src_page->va, src_page->writable, src_page->uninit.init, info)) {
+			
+				free (info);
+				info = NULL;
+				return false;
+			}
+		}
+		else{
+			if(!vm_alloc_page (src_page->operations->type, src_page->va, src_page->writable)) {
+				return false;
+			}
+
+			if(!vm_claim_page (src_page->va)) {
+				return false;
+			}
+
+			struct page *dst_page = spt_find_page (dst, src_page->va);
+			memcpy (dst_page->frame->kva, src_page->frame->kva, PGSIZE);
+
+		}
+	}
+
+	return true;
 }
 
-/* callback function */
+/* callback function for spt_kill below */
 static void
 spt_page_destroy (struct hash_elem *e, void *aux UNUSED) {
-	struct page *page = hash_entry(e, struct page, hash_elem);
+	struct page *page = hash_entry (e, struct page, hash_elem);
 	vm_dealloc_page (page);
 }
 
@@ -275,5 +333,5 @@ spt_page_destroy (struct hash_elem *e, void *aux UNUSED) {
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt) {
 
-	hash_destroy(&spt->pages, spt_page_destroy);
+	hash_destroy (&spt->pages, spt_page_destroy);
 }

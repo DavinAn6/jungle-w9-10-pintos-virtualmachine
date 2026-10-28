@@ -91,6 +91,14 @@ struct supplemental_page_table {
 	struct hash pages;
 };
 
+struct lazy_load_info {
+	struct file *file;
+	off_t ofs;
+	uint32_t page_read_bytes;
+	uint32_t page_zero_bytes;
+};
+
+
 #include "threads/thread.h"
 void supplemental_page_table_init (struct supplemental_page_table *spt);
 bool supplemental_page_table_copy (struct supplemental_page_table *dst,
