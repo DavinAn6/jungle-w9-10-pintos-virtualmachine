@@ -259,6 +259,61 @@ supplemental_page_table_init (struct supplemental_page_table *spt) {
 	hash_init (&spt->pages, page_hash, page_less, NULL);
 }
 
+/* supplemental_page_table_copy helper function 1 */
+static bool
+copy_uninit_page (struct page *src_page) {
+	struct lazy_load_info *dst_info;
+	struct lazy_load_info *src_info;
+
+	src_info = (struct lazy_load_info *) src_page->uninit.aux;
+
+	if (src_info == NULL) {
+		if (!vm_alloc_page_with_initializer (src_page->uninit.type, src_page->va,
+				src_page->writable, src_page->uninit.init, NULL)) {
+			return false;
+		}
+		else {
+			return true;
+		}
+	}
+
+	dst_info = malloc (sizeof(*dst_info));
+	if (dst_info == NULL) {
+		return false;
+	}
+
+	dst_info->file = src_info->file;
+	dst_info->ofs = src_info->ofs;
+	dst_info->page_read_bytes = src_info->page_read_bytes;
+	dst_info->page_zero_bytes = src_info->page_zero_bytes;
+
+	if (!vm_alloc_page_with_initializer (src_page->uninit.type, src_page->va,
+			src_page->writable, src_page->uninit.init, dst_info)) {
+		free(dst_info);
+		return false;
+	}
+
+	return true;
+}
+
+/* supplemental_page_table_copy helper function 2 */
+static bool
+copy_initialized_page (struct supplemental_page_table *dst, struct page *src_page) {
+	if (!vm_alloc_page (src_page->operations->type, src_page->va,
+			src_page->writable)) {
+				return false;
+			}
+	
+	if (!vm_claim_page (src_page->va)) {
+		return false;
+	}
+
+	struct page *dst_page = spt_find_page (dst, src_page->va);
+	memcpy (dst_page->frame->kva, src_page->frame->kva, PGSIZE);
+
+	return true;
+}
+
 /* Copy supplemental page table from src to dst */
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst,
@@ -275,50 +330,16 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 		e = hash_next (&iterator);
 
 		if (src_page->operations->type == VM_UNINIT) {
-			struct lazy_load_info *info;
-			struct lazy_load_info *src_info;
-
-			src_info = (struct lazy_load_info *) src_page->uninit.aux;
-
-			if (src_info == NULL) {
-				if (!vm_alloc_page_with_initializer (src_page->uninit.type, src_page->va, src_page->writable, src_page->uninit.init, NULL)) {
-					return false;
-				}
-				continue;
-			}
-
-			info = malloc (sizeof(*info));
-			if (info == NULL) {
-				return false;
-			}
-			
-			info->file = src_info->file;
-			info->ofs = src_info->ofs;
-			info->page_read_bytes = src_info->page_read_bytes;
-			info->page_zero_bytes = src_info->page_zero_bytes;
-
-			if (!vm_alloc_page_with_initializer (src_page->uninit.type, src_page->va, src_page->writable, src_page->uninit.init, info)) {
-			
-				free (info);
-				info = NULL;
+			if (!copy_uninit_page(src_page)) {
 				return false;
 			}
 		}
-		else{
-			if(!vm_alloc_page (src_page->operations->type, src_page->va, src_page->writable)) {
+		else {
+			if (!copy_initialized_page(dst, src_page)) {
 				return false;
 			}
-
-			if(!vm_claim_page (src_page->va)) {
-				return false;
-			}
-
-			struct page *dst_page = spt_find_page (dst, src_page->va);
-			memcpy (dst_page->frame->kva, src_page->frame->kva, PGSIZE);
-
 		}
 	}
-
 	return true;
 }
 
