@@ -10,6 +10,7 @@
 
 #include "vm/vm.h"
 #include "vm/uninit.h"
+#include "threads/malloc.h"
 
 static bool uninit_initialize (struct page *page, void *kva);
 static void uninit_destroy (struct page *page);
@@ -43,6 +44,8 @@ uninit_new (struct page *page, void *va, vm_initializer *init,
 }
 
 /* Initalize the page on first fault */
+/* VM_UNINIT page를 최종 타입인 VM_ANON 또는 VM_FILE로 전환하고,
+   필요하면 lazy-loading callback을 실행하는 것*/
 static bool
 uninit_initialize (struct page *page, void *kva) {
 	struct uninit_page *uninit = &page->uninit;
@@ -62,7 +65,7 @@ uninit_initialize (struct page *page, void *kva) {
  * PAGE will be freed by the caller. */
 static void
 uninit_destroy (struct page *page) {
-	struct uninit_page *uninit UNUSED = &page->uninit;
-	/* TODO: Fill this function.
-	 * TODO: If you don't have anything to do, just return. */
+	struct uninit_page *uninit = &page->uninit;
+
+	free (uninit->aux); /* 끝까지 초기화되지 않은 page가 갖고 있는 aux(lazy_load_info) 정리 */
 }
