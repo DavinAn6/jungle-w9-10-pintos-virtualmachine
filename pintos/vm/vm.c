@@ -240,8 +240,34 @@ supplemental_page_table_init (struct supplemental_page_table *spt) {
 
 /* Copy supplemental page table from src to dst */
 bool
-supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
-		struct supplemental_page_table *src UNUSED) {
+supplemental_page_table_copy (struct supplemental_page_table *dst,
+		struct supplemental_page_table *src) {
+	struct hash_iterator i;
+	hash_first (&i, &src->pages);
+	while (hash_next (&i)) {
+		struct page *p = hash_entry (hash_cur (&i), struct page, hash_elem);
+		if (p->operations->type == VM_UNINIT) {
+			struct lazy_load_arg *aux = malloc (sizeof (struct lazy_load_arg));
+			if (aux == NULL) {
+				return false;
+			}
+			memcpy (aux, p->uninit.aux, sizeof (struct lazy_load_arg));
+			if (!vm_alloc_page_with_initializer (p->uninit.type, p->va, p->writable, p->uninit.init, aux)) {
+				free (aux);
+				return false;
+			}
+		} else {
+			if (!vm_alloc_page (VM_ANON, p->va, p->writable)) {
+				return false;
+			}
+			if (!vm_claim_page (p->va)) {
+				return false;
+			}
+			struct page *child = spt_find_page (dst, p->va);
+			memcpy (child->frame->kva, p->frame->kva, PGSIZE);
+		}
+	}
+	return true;
 }
 
 static void
