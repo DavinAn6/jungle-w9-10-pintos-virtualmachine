@@ -4,7 +4,6 @@
 #include "tests/main.h"
 
 void
-test_main (void) 
-{
-  CHECK (create ("quux.dat", 0), "create quux.dat");
+test_main (void) {
+    CHECK (create ("quux.dat", 0), "create quux.dat");
 }

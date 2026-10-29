@@ -3,6 +3,7 @@
 
 #include "threads/loader.h"
 
-void gdt_init (void);
+void
+gdt_init (void);
 
 #endif /* userprog/gdt.h */

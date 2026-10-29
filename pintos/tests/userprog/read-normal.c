@@ -5,7 +5,6 @@
 #include "tests/main.h"
 
 void
-test_main (void) 
-{
-  check_file ("sample.txt", sample, sizeof sample - 1);
+test_main (void) {
+    check_file ("sample.txt", sample, sizeof sample - 1);
 }
