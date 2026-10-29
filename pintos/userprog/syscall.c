@@ -20,8 +20,10 @@
 #include "devices/input.h"
 #include "vm/vm.h"
 
-void syscall_entry (void);
-void syscall_handler (struct intr_frame *);
+void
+syscall_entry (void);
+void
+syscall_handler (struct intr_frame *);
 struct lock file_lock;
 
 typedef int pid_t;
@@ -41,66 +43,61 @@ typedef int pid_t;
 
 void
 syscall_init (void) {
-	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
-			((uint64_t)SEL_KCSEG) << 32);
-	write_msr(MSR_LSTAR, (uint64_t) syscall_entry);
+    write_msr (MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48 | ((uint64_t)SEL_KCSEG) << 32);
+    write_msr (MSR_LSTAR, (uint64_t)syscall_entry);
 
-	/* The interrupt service rountine should not serve any interrupts
+    /* The interrupt service rountine should not serve any interrupts
 	 * until the syscall_entry swaps the userland stack to the kernel
 	 * mode stack. Therefore, we masked the FLAG_FL. */
-	write_msr(MSR_SYSCALL_MASK,
-			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
-	
-	lock_init(&file_lock);
+    write_msr (MSR_SYSCALL_MASK, FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+
+    lock_init (&file_lock);
 }
-
-
 
 static void
 halt (void) {
-	power_off ();
+    power_off ();
 }
 
 void
 exit (int status) {
-	struct thread *curr = thread_current ();
-	curr->exit_status = status;
-	thread_exit ();
+    struct thread *curr = thread_current ();
+    curr->exit_status = status;
+    thread_exit ();
 }
 
 static void
 claim_page_if_needed (void *addr) {
-	if (!pml4_get_page(thread_current()->pml4, addr)) {
-		struct page *p;
-		p = spt_find_page(&thread_current()->spt, addr);
+    if (!pml4_get_page (thread_current ()->pml4, addr)) {
+        struct page *p;
+        p = spt_find_page (&thread_current ()->spt, addr);
 
-		if (p != NULL) {
-			if (!vm_claim_page(addr)) {
-				exit(-1);
-			}
-		}
-		else {
-			exit(-1);
-		}
-	}
+        if (p != NULL) {
+            if (!vm_claim_page (addr)) {
+                exit (-1);
+            }
+        } else {
+            exit (-1);
+        }
+    }
 }
 
 static void
-range_chk (void *args, void *end_args){
-	if ((args == NULL) || !is_user_vaddr(args)){
-		exit(-1);
-	}
+range_chk (void *args, void *end_args) {
+    if ((args == NULL) || !is_user_vaddr (args)) {
+        exit (-1);
+    }
 
-	claim_page_if_needed (args);
+    claim_page_if_needed (args);
 
-	if (end_args != NULL){
-		for (uintptr_t i = (uintptr_t) pg_round_down(args); i <= end_args - 1; i += PGSIZE){
-			if (!is_user_vaddr(i)){
-				exit(-1);
-			}
-			claim_page_if_needed (i);
-		}
-	}
+    if (end_args != NULL) {
+        for (uintptr_t i = (uintptr_t)pg_round_down (args); i <= end_args - 1; i += PGSIZE) {
+            if (!is_user_vaddr (i)) {
+                exit (-1);
+            }
+            claim_page_if_needed (i);
+        }
+    }
 }
 
 /* 문자열 전용 함수
@@ -111,277 +108,279 @@ range_chk (void *args, void *end_args){
 
 static void
 string_chk (const char *str) {
-	const char *p = str;
+    const char *p = str;
 
-	for (;;) {
-		/* 첫 바이트와 새로운 페이지의 첫 바이트를 역참조하기 전에 검사한다. */
-		if (p == str || pg_ofs (p) == 0)
-			range_chk ((void *) p, NULL);
+    for (;;) {
+        /* 첫 바이트와 새로운 페이지의 첫 바이트를 역참조하기 전에 검사한다. */
+        if (p == str || pg_ofs (p) == 0) {
+            range_chk ((void *)p, NULL);
+        }
 
-		if (*p == '\0')
-			return;
+        if (*p == '\0') {
+            return;
+        }
 
-		p++;
-	}
+        p++;
+    }
 }
 
 static pid_t
-fork (const char *thread_name, struct intr_frame *f){
-	// 1) thread_name 주소 검사
-	string_chk(thread_name);
+fork (const char *thread_name, struct intr_frame *f) {
+    // 1) thread_name 주소 검사
+    string_chk (thread_name);
 
-	// 2) process_fork 호출 및 반환
-	return process_fork(thread_name, f);
-
+    // 2) process_fork 호출 및 반환
+    return process_fork (thread_name, f);
 }
 
 static int
 exec (const char *file) {
-	string_chk(file);
+    string_chk (file);
 
-	// /* 파일 이름 보존 위해 palloc 으로 할당 (process_cleanup 에서 사라지지 않게 하기 위해)*/
-	// char *file_name = palloc_get_page(0);
-	// memcpy(file_name, file, strlen(file) + 1);
+    // /* 파일 이름 보존 위해 palloc 으로 할당 (process_cleanup 에서 사라지지 않게 하기 위해)*/
+    // char *file_name = palloc_get_page(0);
+    // memcpy(file_name, file, strlen(file) + 1);
 
-	int rtn = process_exec((void *) file);
-	// palloc_free_page(file_name);
-	
-	if (rtn == -1) {
-		exit(-1);
-	}
-	return rtn;
+    int rtn = process_exec ((void *)file);
+    // palloc_free_page(file_name);
+
+    if (rtn == -1) {
+        exit (-1);
+    }
+    return rtn;
 }
 
 static int
 wait (pid_t pid) {
-	return process_wait(pid);
+    return process_wait (pid);
 }
 
 static bool
 create (const char *file, unsigned initial_size) {
-	string_chk(file);					//# 포인터 유효성 검증
-	lock_acquire(&file_lock);				//# 파일시스템 락 설정
+    string_chk (file);         //# 포인터 유효성 검증
+    lock_acquire (&file_lock); //# 파일시스템 락 설정
 
-	bool result = filesys_create(file, initial_size);  //# 파일 생성
-	lock_release(&file_lock);
-	return result;
+    bool result = filesys_create (file, initial_size); //# 파일 생성
+    lock_release (&file_lock);
+    return result;
 }
 
 static bool
 remove (const char *file) {
-	string_chk(file);
-	lock_acquire(&file_lock);
-	bool result = filesys_remove(file);
-	lock_release(&file_lock);
-	return result;
+    string_chk (file);
+    lock_acquire (&file_lock);
+    bool result = filesys_remove (file);
+    lock_release (&file_lock);
+    return result;
 }
 
 static int
 open (const char *file) {
-	string_chk(file);
+    string_chk (file);
 
-	// 파일 오픈
-	lock_acquire(&file_lock);
-	struct file *file_rtn = filesys_open(file);
-	lock_release(&file_lock);
+    // 파일 오픈
+    lock_acquire (&file_lock);
+    struct file *file_rtn = filesys_open (file);
+    lock_release (&file_lock);
 
-	if (file_rtn == NULL) return -1;
+    if (file_rtn == NULL) {
+        return -1;
+    }
 
-	// 파일 fd 테이블에 저장하기
-	struct file **curr_file_p = thread_current()->file_p;
+    // 파일 fd 테이블에 저장하기
+    struct file **curr_file_p = thread_current ()->file_p;
 
-	for (int i = FD_START; i < FD_MAX; i++){
-		if (curr_file_p[i] == NULL) {
-			curr_file_p[i] = file_rtn;
-			return i;
-		}
-	}
-	
-	lock_acquire(&file_lock);
-	file_close(file_rtn);
-	lock_release(&file_lock);
+    for (int i = FD_START; i < FD_MAX; i++) {
+        if (curr_file_p[i] == NULL) {
+            curr_file_p[i] = file_rtn;
+            return i;
+        }
+    }
 
-	return -1;
+    lock_acquire (&file_lock);
+    file_close (file_rtn);
+    lock_release (&file_lock);
 
+    return -1;
 }
 
 static int
 filesize (int fd) {
-	struct thread *t = thread_current();
+    struct thread *t = thread_current ();
 
-	if (fd < FD_START || fd >= FD_MAX || t->file_p[fd] == NULL) {
-		return -1;
-	}
-	lock_acquire(&file_lock);
-	int length = file_length(t->file_p[fd]);
-	lock_release(&file_lock);
+    if (fd < FD_START || fd >= FD_MAX || t->file_p[fd] == NULL) {
+        return -1;
+    }
+    lock_acquire (&file_lock);
+    int length = file_length (t->file_p[fd]);
+    lock_release (&file_lock);
 
-	return length;
+    return length;
 }
 
 static int
 read (int fd, void *buffer, unsigned size) {
-	struct thread *curr = thread_current();
+    struct thread *curr = thread_current ();
 
-	//# buffer 포인터 유효성 검증
-	if (size == 0) {
-		return 0;
-	}
+    //# buffer 포인터 유효성 검증
+    if (size == 0) {
+        return 0;
+    }
 
-	//# 버퍼의 모든 페이지가 매핑되어 있는지 검사.
-	range_chk(buffer, buffer + size);
+    //# 버퍼의 모든 페이지가 매핑되어 있는지 검사.
+    range_chk (buffer, buffer + size);
 
-	//# 각 페이지가 쓰기 가능한지 검사
-	uintptr_t last = (uintptr_t) buffer + size -1;
+    //# 각 페이지가 쓰기 가능한지 검사
+    uintptr_t last = (uintptr_t)buffer + size - 1;
 
-	for (uintptr_t page_addr = (uintptr_t) pg_round_down (buffer);
-			page_addr <= (uintptr_t) pg_round_down ((void *) last);
-			page_addr += PGSIZE) {
-		uint64_t *pte =
-			pml4e_walk (curr->pml4, page_addr, 0);
-		if (pte == NULL || !is_writable (pte))
-			exit (-1);
-	}
+    for (uintptr_t page_addr = (uintptr_t)pg_round_down (buffer);
+         page_addr <= (uintptr_t)pg_round_down ((void *)last);
+         page_addr += PGSIZE) {
+        uint64_t *pte = pml4e_walk (curr->pml4, page_addr, 0);
+        if (pte == NULL || !is_writable (pte)) {
+            exit (-1);
+        }
+    }
 
-	//# fd0 키보드에서 읽기
-	if (fd == 0) {
-		for (unsigned i = 0; i < size; i++) {
-			((char *)buffer)[i] = input_getc();
-		}
-		return size;
-	} 
-	
-	//# fd1 읽기 대상이 아니므로 -1 반환
-	if (fd == 1) {
-		return -1;
-	}
+    //# fd0 키보드에서 읽기
+    if (fd == 0) {
+        for (unsigned i = 0; i < size; i++) {
+            ((char *)buffer)[i] = input_getc ();
+        }
+        return size;
+    }
 
-	//# fd가 유효한 범위인지 확인
-	if (fd < FD_START || fd >= FD_MAX) {
-		return -1;
-	}
-	
-	//# fd2 : 파일에서 읽기
-	struct file *f = curr->file_p[fd];
-	if (f == NULL) {
-		return -1;
-	}
-	lock_acquire(&file_lock);				//# 파일시스템 락 설정
-	int result = file_read(f, buffer, size);
-	lock_release(&file_lock);
-	return result;
+    //# fd1 읽기 대상이 아니므로 -1 반환
+    if (fd == 1) {
+        return -1;
+    }
+
+    //# fd가 유효한 범위인지 확인
+    if (fd < FD_START || fd >= FD_MAX) {
+        return -1;
+    }
+
+    //# fd2 : 파일에서 읽기
+    struct file *f = curr->file_p[fd];
+    if (f == NULL) {
+        return -1;
+    }
+    lock_acquire (&file_lock); //# 파일시스템 락 설정
+    int result = file_read (f, buffer, size);
+    lock_release (&file_lock);
+    return result;
 }
 
 static int
 write (int fd, const void *buffer, unsigned size) {
-	range_chk(buffer, buffer + size);
+    range_chk (buffer, buffer + size);
 
-	if (fd == 1) {
-		putbuf (buffer, size);
-		return size;
-	} 
+    if (fd == 1) {
+        putbuf (buffer, size);
+        return size;
+    }
 
-	if (FD_START > fd || fd >= FD_MAX) return -1;
+    if (FD_START > fd || fd >= FD_MAX) {
+        return -1;
+    }
 
-	struct file *curr_file_p = thread_current()->file_p[fd];
-	if (curr_file_p == NULL) return -1;
+    struct file *curr_file_p = thread_current ()->file_p[fd];
+    if (curr_file_p == NULL) {
+        return -1;
+    }
 
-	lock_acquire(&file_lock);
-	off_t t = file_write(curr_file_p, buffer, size);
-	lock_release(&file_lock);
-	
-	return t;
+    lock_acquire (&file_lock);
+    off_t t = file_write (curr_file_p, buffer, size);
+    lock_release (&file_lock);
 
+    return t;
 }
 
 static void
 seek (int fd, unsigned position) {
-	struct thread *t = thread_current();
-	if (fd < FD_START || fd >= FD_MAX || t->file_p[fd] == NULL) {
-		return;
-	}
+    struct thread *t = thread_current ();
+    if (fd < FD_START || fd >= FD_MAX || t->file_p[fd] == NULL) {
+        return;
+    }
 
-	lock_acquire(&file_lock);
-	file_seek(t->file_p[fd], position);
-	lock_release(&file_lock);
+    lock_acquire (&file_lock);
+    file_seek (t->file_p[fd], position);
+    lock_release (&file_lock);
 }
 
 static unsigned
 tell (int fd) {
-	struct thread *t = thread_current();
-	if (fd < FD_START || fd >= FD_MAX || t->file_p[fd] == NULL){
-		return -1;
-	}
+    struct thread *t = thread_current ();
+    if (fd < FD_START || fd >= FD_MAX || t->file_p[fd] == NULL) {
+        return -1;
+    }
 
-	lock_acquire(&file_lock);
-	unsigned re = file_tell(t->file_p[fd]);
-	lock_release(&file_lock);
+    lock_acquire (&file_lock);
+    unsigned re = file_tell (t->file_p[fd]);
+    lock_release (&file_lock);
 
-	return re;
+    return re;
 }
 
 static void
 close (int fd) {
-	struct thread *t = thread_current();
-	if (fd < FD_START || fd >= FD_MAX || t->file_p[fd] == NULL) {
-		return;
-	}
-	lock_acquire(&file_lock);
-	file_close(t->file_p[fd]);
-	lock_release(&file_lock);
-	t->file_p[fd] = NULL;
+    struct thread *t = thread_current ();
+    if (fd < FD_START || fd >= FD_MAX || t->file_p[fd] == NULL) {
+        return;
+    }
+    lock_acquire (&file_lock);
+    file_close (t->file_p[fd]);
+    lock_release (&file_lock);
+    t->file_p[fd] = NULL;
 }
-
-
 
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
-	int syscall_num = f->R.rax;
+    int syscall_num = f->R.rax;
 
-	switch (syscall_num) {
-		case SYS_HALT:
-			halt ();
-			break;
-		case SYS_EXIT:
-			exit (f->R.rdi);
-			break;
-		case SYS_FORK:
-			f->R.rax = fork ((const char *)f->R.rdi, f);
-			break;
-		case SYS_EXEC:
-			f->R.rax = exec ((const char *)f->R.rdi);
-			break;
-		case SYS_WAIT:
-			f->R.rax = wait (f->R.rdi);
-			break;
-		case SYS_CREATE:
-			f->R.rax = create ((const char *)f->R.rdi, f->R.rsi);
-			break;
-		case SYS_REMOVE:
-			f->R.rax = remove ((const char *)f->R.rdi);
-			break;
-		case SYS_OPEN:
-			f->R.rax = open ((const char *)f->R.rdi);
-			break;
-		case SYS_FILESIZE:
-			f->R.rax = filesize (f->R.rdi);
-			break;
-		case SYS_READ:
-			f->R.rax = read (f->R.rdi, (void *)f->R.rsi, f->R.rdx);
-			break;
-		case SYS_WRITE:
-			f->R.rax = write (f->R.rdi, f->R.rsi, f->R.rdx);
-			break;
-		case SYS_SEEK:
-			seek (f->R.rdi, f->R.rsi);
-			break;
-		case SYS_TELL:
-			f->R.rax = tell (f->R.rdi);
-			break;
-		case SYS_CLOSE:
-			close (f->R.rdi);
-			break;
-	}
+    switch (syscall_num) {
+    case SYS_HALT:
+        halt ();
+        break;
+    case SYS_EXIT:
+        exit (f->R.rdi);
+        break;
+    case SYS_FORK:
+        f->R.rax = fork ((const char *)f->R.rdi, f);
+        break;
+    case SYS_EXEC:
+        f->R.rax = exec ((const char *)f->R.rdi);
+        break;
+    case SYS_WAIT:
+        f->R.rax = wait (f->R.rdi);
+        break;
+    case SYS_CREATE:
+        f->R.rax = create ((const char *)f->R.rdi, f->R.rsi);
+        break;
+    case SYS_REMOVE:
+        f->R.rax = remove ((const char *)f->R.rdi);
+        break;
+    case SYS_OPEN:
+        f->R.rax = open ((const char *)f->R.rdi);
+        break;
+    case SYS_FILESIZE:
+        f->R.rax = filesize (f->R.rdi);
+        break;
+    case SYS_READ:
+        f->R.rax = read (f->R.rdi, (void *)f->R.rsi, f->R.rdx);
+        break;
+    case SYS_WRITE:
+        f->R.rax = write (f->R.rdi, f->R.rsi, f->R.rdx);
+        break;
+    case SYS_SEEK:
+        seek (f->R.rdi, f->R.rsi);
+        break;
+    case SYS_TELL:
+        f->R.rax = tell (f->R.rdi);
+        break;
+    case SYS_CLOSE:
+        close (f->R.rdi);
+        break;
+    }
 }
-

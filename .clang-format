@@ -1,0 +1,76 @@
+
+# C/C++ formatting rules
+BasedOnStyle: LLVM
+
+Language: Cpp
+Standard: c++17
+
+# Indentation
+IndentWidth: 4
+ContinuationIndentWidth: 4
+TabWidth: 4
+UseTab: Never
+IndentCaseLabels: false
+IndentCaseBlocks: false
+NamespaceIndentation: None
+
+# Line length and wrapping
+ColumnLimit: 100
+PenaltyBreakBeforeFirstCallParameter: 100
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+BinPackArguments: false
+BinPackParameters: false
+
+# Braces
+BreakBeforeBraces: Attach
+BraceWrapping:
+  AfterCaseLabel: false
+  AfterClass: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeCatch: false
+  BeforeElse: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: true
+
+# Spacing
+SpaceBeforeParens: Always
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpaceInEmptyParentheses: false
+SpaceAfterCStyleCast: false
+PointerAlignment: Right
+DerivePointerAlignment: false
+ReferenceAlignment: Pointer
+AlignAfterOpenBracket: Align
+AlignOperands: Align
+AlignTrailingComments: true
+
+# Includes and declarations
+SortIncludes: Never
+IncludeBlocks: Preserve
+SortUsingDeclarations: true
+AccessModifierOffset: -4
+ConstructorInitializerIndentWidth: 4
+PackConstructorInitializers: Never
+BreakConstructorInitializers: BeforeComma
+AlwaysBreakAfterReturnType: All
+
+# General consistency
+ReflowComments: false
+FixNamespaceComments: true
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+SeparateDefinitionBlocks: Always
+
+# Add braces to control statements
+InsertBraces: true

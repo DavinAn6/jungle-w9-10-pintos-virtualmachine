@@ -4,8 +4,7 @@
 #include "tests/main.h"
 
 void
-test_main (void) 
-{
-  halt ();
-  fail ("should have halted");
+test_main (void) {
+    halt ();
+    fail ("should have halted");
 }

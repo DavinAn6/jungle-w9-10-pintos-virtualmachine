@@ -5,7 +5,6 @@
 #include "tests/main.h"
 
 void
-test_main (void) 
-{
-  msg ("create(NULL): %d", create (NULL, 0));
+test_main (void) {
+    msg ("create(NULL): %d", create (NULL, 0));
 }

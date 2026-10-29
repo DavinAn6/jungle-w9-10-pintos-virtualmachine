@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 
-unsigned long cksum(const void *, size_t);
+unsigned long
+cksum (const void *, size_t);
 
 #endif /* tests/cksum.h */

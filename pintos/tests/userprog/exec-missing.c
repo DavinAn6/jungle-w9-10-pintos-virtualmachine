@@ -6,7 +6,6 @@
 #include "tests/main.h"
 
 void
-test_main (void) 
-{
-  msg ("exec(\"no-such-file\"): %d", exec ("no-such-file"));
+test_main (void) {
+    msg ("exec(\"no-such-file\"): %d", exec ("no-such-file"));
 }

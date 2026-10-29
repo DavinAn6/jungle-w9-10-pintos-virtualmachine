@@ -4,7 +4,6 @@
 #include "tests/main.h"
 
 void
-test_main (void) 
-{
-  msg ("create(\"\"): %d", create ("", 0));
+test_main (void) {
+    msg ("create(\"\"): %d", create ("", 0));
 }
