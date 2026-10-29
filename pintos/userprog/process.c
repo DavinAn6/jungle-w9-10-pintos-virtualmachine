@@ -925,9 +925,8 @@ static bool
 lazy_load_segment (struct page *page, void *aux) {
     struct lazy_load_info *info = aux;
 
-    file_seek (info->file, info->ofs);
-
-    off_t bytes_read = file_read (info->file, page->frame->kva, (off_t)info->page_read_bytes);
+    off_t bytes_read =
+        file_read_at (info->file, page->frame->kva, (off_t)info->page_read_bytes, info->ofs);
     if (bytes_read != info->page_read_bytes) {
         free (info);
         info = NULL;
