@@ -77,7 +77,9 @@ claim_page_if_needed (void *addr) {
                 exit (-1);
             }
         } else {
-            exit (-1);
+            if (!vm_try_handle_fault (NULL, addr, false, false, true)) {
+                exit (-1);
+            }
         }
     }
 }
