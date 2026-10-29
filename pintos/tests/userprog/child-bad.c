@@ -6,8 +6,7 @@
 #include "tests/main.h"
 
 void
-test_main (void) 
-{
-  exec ("pintos");
-  fail ("should have exited with -1");
+test_main (void) {
+    exec ("pintos");
+    fail ("should have exited with -1");
 }

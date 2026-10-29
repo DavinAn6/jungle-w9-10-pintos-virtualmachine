@@ -6,7 +6,6 @@
 #include "tests/main.h"
 
 void
-test_main (void) 
-{
-  open (NULL);
+test_main (void) {
+    open (NULL);
 }
