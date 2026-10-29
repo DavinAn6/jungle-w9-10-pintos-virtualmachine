@@ -70,12 +70,12 @@ exit (int status) {
 
 static void
 range_chk (void *args, void *end_args){
-	if ((args == NULL) || !is_user_vaddr(args) || !pml4_get_page(thread_current()->pml4, args)){
+	if ((args == NULL) || !is_user_vaddr(args) || spt_find_page (&thread_current ()->spt, args) == NULL){
 		exit(-1);
 	}
 	if (end_args != NULL){
 		for (uintptr_t i = (uintptr_t) pg_round_down(args); i <= end_args - 1; i += PGSIZE){
-			if (!is_user_vaddr(i) || !pml4_get_page(thread_current()->pml4, (const void *) i)){
+			if (!is_user_vaddr(i) || spt_find_page (&thread_current ()->spt, (void *) i) == NULL){
 				exit(-1);
 			}
 		}
@@ -216,10 +216,10 @@ read (int fd, void *buffer, unsigned size) {
 	for (uintptr_t page_addr = (uintptr_t) pg_round_down (buffer);
 			page_addr <= (uintptr_t) pg_round_down ((void *) last);
 			page_addr += PGSIZE) {
-		uint64_t *pte =
-			pml4e_walk (curr->pml4, page_addr, 0);
-		if (pte == NULL || !is_writable (pte))
+		struct page *page = spt_find_page (&thread_current ()->spt, (void *) page_addr);
+		if (page == NULL || !page->writable) {
 			exit (-1);
+		}
 	}
 
 	//# fd0 키보드에서 읽기
