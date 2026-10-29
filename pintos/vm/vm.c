@@ -180,7 +180,10 @@ vm_get_frame (void) {
 
 /* Growing the stack. */
 static void
-vm_stack_growth (void *addr UNUSED) {
+vm_stack_growth (void *addr) {
+	addr = pg_round_down(addr);
+	
+	vm_alloc_page(VM_ANON | VM_MARKER_0, addr, true);
 }
 
 /* Handle the fault on write_protected page */
@@ -218,7 +221,8 @@ vm_try_handle_fault (struct intr_frame *f, void *addr,
 			(uintptr_t)addr >= (uintptr_t)USER_STACK - (1UL << 20) &&
 			(uintptr_t)addr < (uintptr_t)USER_STACK) {
 			vm_stack_growth(addr);
-			return true;
+
+			return vm_claim_page(addr);
 		}
 		else{
 			return false;
