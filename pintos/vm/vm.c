@@ -5,6 +5,7 @@
 #include "vm/inspect.h"
 #include "hash.h"
 #include "threads/vaddr.h"
+#include "threads/thread.h"
 #include <string.h>
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
@@ -190,8 +191,8 @@ vm_handle_wp (struct page *page UNUSED) {
 /* fault가 발생한 주소가 lazy page인지 판단하고, 해당 page를 claim 하는 것 */
 /* Return true on success */
 bool
-vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr,
-		bool user UNUSED, bool write, bool not_present) {
+vm_try_handle_fault (struct intr_frame *f, void *addr,
+		bool user, bool write, bool not_present) {
 	struct supplemental_page_table *spt = &thread_current ()->spt;
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
@@ -205,7 +206,23 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr,
 
 	page = spt_find_page(spt, addr);
 	if (page == NULL) {
-		return false;
+		uintptr_t rsp;
+		if (user == true) {
+			rsp = f->rsp;
+		}
+		else {
+			rsp = thread_current()->user_rsp;
+		}
+
+		if ((uintptr_t)addr >= rsp - 8 && 
+			(uintptr_t)addr >= (uintptr_t)USER_STACK - (1UL << 20) &&
+			(uintptr_t)addr < (uintptr_t)USER_STACK) {
+			vm_stack_growth(addr);
+			return true;
+		}
+		else{
+			return false;
+		}
 	}
 
 	if (write && !page->writable) {

@@ -336,8 +336,9 @@ close (int fd) {
 
 /* The main system call interface */
 void
-syscall_handler (struct intr_frame *f UNUSED) {
+syscall_handler (struct intr_frame *f) {
 	int syscall_num = f->R.rax;
+	thread_current()->user_rsp = f->rsp;
 
 	switch (syscall_num) {
 		case SYS_HALT:
