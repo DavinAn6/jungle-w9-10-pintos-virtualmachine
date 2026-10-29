@@ -18,7 +18,7 @@
 #include "filesys/filesys.h"
 #include "filesys/off_t.h"
 #include "devices/input.h"
-
+#include "vm/vm.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -69,15 +69,36 @@ exit (int status) {
 }
 
 static void
-range_chk (void *args, void *end_args){
-	if ((args == NULL) || !is_user_vaddr(args) || !pml4_get_page(thread_current()->pml4, args)){
-		exit(-1);
-	}
-	if (end_args != NULL){
-		for (uintptr_t i = (uintptr_t) pg_round_down(args); i <= end_args - 1; i += PGSIZE){
-			if (!is_user_vaddr(i) || !pml4_get_page(thread_current()->pml4, (const void *) i)){
+claim_page_if_needed (void *addr) {
+	if (!pml4_get_page(thread_current()->pml4, addr)) {
+		struct page *p;
+		p = spt_find_page(&thread_current()->spt, addr);
+
+		if (p != NULL) {
+			if (!vm_claim_page(addr)) {
 				exit(-1);
 			}
+		}
+		else {
+			exit(-1);
+		}
+	}
+}
+
+static void
+range_chk (void *args, void *end_args){
+	if ((args == NULL) || !is_user_vaddr(args)){
+		exit(-1);
+	}
+
+	claim_page_if_needed (args);
+
+	if (end_args != NULL){
+		for (uintptr_t i = (uintptr_t) pg_round_down(args); i <= end_args - 1; i += PGSIZE){
+			if (!is_user_vaddr(i)){
+				exit(-1);
+			}
+			claim_page_if_needed (i);
 		}
 	}
 }
