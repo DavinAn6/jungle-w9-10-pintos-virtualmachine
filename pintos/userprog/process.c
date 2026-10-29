@@ -590,6 +590,8 @@ load (const char *file_name, struct intr_frame *if_) {
 	if (t->pml4 == NULL)
 		goto done;
 	process_activate (thread_current ());
+	/* load 다시 초기화 kill 이후 재생성 */
+	supplemental_page_table_init (&thread_current ()->spt);
 
 	//# Argument Passing 구현 
 	char *token, *save_ptr;
