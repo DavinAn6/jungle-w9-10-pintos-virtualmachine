@@ -40,6 +40,15 @@ struct thread;
 
 #define VM_TYPE(type) ((type) & 7)
 
+//# lazy_load_segment 함수 전달용
+struct load_aux {
+	struct file *file;
+	off_t ofs;
+	uint32_t page_read_bytes;
+	uint32_t page_zero_bytes;
+};
+
+
 /* The representation of "page".
  * This is kind of "parent class", which has four "child class"es, which are
  * uninit_page, file_page, anon_page, and page cache (project4).

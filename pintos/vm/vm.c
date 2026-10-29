@@ -5,6 +5,7 @@
 #include "vm/inspect.h"
 #include "hash.h"
 #include "threads/vaddr.h"
+#include "filesys/file.h"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -105,8 +106,9 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable, v
 		case VM_FILE :
 			initializer = file_backed_initializer;
 			break;
-		free(page);
-		goto err;
+		default :
+			free(page);
+			goto err;
 	}
 
 	//* VM_ANON 또는 VM_FILE 초기화
@@ -161,7 +163,6 @@ void
 spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 	hash_delete(&spt->pages, &page->hash_elem);
 	vm_dealloc_page (page);
-	return true;
 }
 
 /* Get the struct frame, that will be evicted. */
@@ -327,10 +328,6 @@ supplemental_page_table_init (struct supplemental_page_table *spt) {
  */
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst, struct supplemental_page_table *src) {
-
-	//* Destination SPT 초기화
-	supplemental_page_table_init(dst);
-
 	//* Source SPT를 한 페이지씩 순회
 	struct hash_iterator iterator;
 	hash_first(&iterator, &src->pages);
@@ -344,10 +341,32 @@ supplemental_page_table_copy (struct supplemental_page_table *dst, struct supple
 
 		//* 페이지 종류에 맞게 복제 (UNINT, ANON, FILE)
 		if (p->operations->type == VM_UNINIT) {
-			//* 자식 SPT에 등록
-			if (!vm_alloc_page_with_initializer(type, va, writable, p->uninit.init, p->uninit.aux)) {
+			/* 
+			 * 자식 SPT에 등록
+			 * 주의 : 부모와 자식이 같은 load_aux를 가리키면 안됨
+			*/
+			struct load_aux *child_la;
+			if (p->uninit.aux == NULL) {
+				child_la = NULL;
+			} else {
+				struct load_aux *parent_la = p->uninit.aux;
+				if ((child_la = malloc(sizeof(struct load_aux))) == NULL) {
+					return false;
+				}
+				if ((child_la->file = file_reopen(parent_la->file)) == NULL) {
+					free(child_la);
+					return false;
+				}
+				child_la->ofs = parent_la->ofs;
+				child_la->page_read_bytes = parent_la->page_read_bytes;
+				child_la->page_zero_bytes = parent_la->page_zero_bytes;
+			}
+			if (!vm_alloc_page_with_initializer(type, va, writable, p->uninit.init, child_la)) {
+				file_close(child_la->file);
+				free(child_la);
 				return false;
 			}
+		
 		} else if (p->operations->type == VM_ANON) {
 			//* 자식 SPT에 등록
 			if (!vm_alloc_page_with_initializer(type, va, writable, NULL, NULL)) {
@@ -357,8 +376,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst, struct supple
 			if (!vm_claim_page(va)) {
 				return false;
 			}
-			//* 자식 페이지의 프레임 확보
-			struct page *new_page = spt_fine_page(dst, va);
+			struct page *new_page = spt_find_page(dst, va);
 			//* 부모 페이지의 내용 복사
 			memcpy(new_page->frame->kva, p->frame->kva, PGSIZE);
 		} else if (p->operations->type == VM_FILE) {
@@ -371,19 +389,25 @@ supplemental_page_table_copy (struct supplemental_page_table *dst, struct supple
 
 
 
+static void
+spt_kill_helper (struct hash_elem *e, void *aux UNUSED) {
+	struct page *page = hash_entry(e, struct page, hash_elem);
+	vm_dealloc_page(page);
+}
 
 
 /* Free the resource hold by the supplemental page table 
  * 하는 일 : 페이지마다 자원을 정리한 뒤 SPT 전체를 파괴
  * 연관 
- * 		destructor : 해시 항목 하나를 전달받아, 그 항목에 연결된 페이지를 정리하는 함수 (vm_dealloc_page)
+ * 		destructor : 해시 항목 하나를 전달받아, 그 항목에 연결된 페이지를 정리하는 함수 (spt_kill_helper)
  * 		hash_clear() : 해시 테이블의 모든 항목을 하나씩 꺼내서, 각 항목에 destructor를 호출
  * 		hash_destroy() : hash_clear()로 항목들을 정리한 뒤, 해시 테이블의 bucket 배열까지 해제
+ * 				두번째 인자가 hash_elem 포인터를 받는 함수여야함. 헬퍼 함수 생성
  * 		vm_dealloc_page() : 페이지의 destroy()를 실행하고 struct page 메모리를 해제
  */
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
-	hash_destroy(&spt->pages, vm_dealloc_page);
+	hash_destroy(&spt->pages, spt_kill_helper);
 }

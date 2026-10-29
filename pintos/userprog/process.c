@@ -351,6 +351,9 @@ process_exec (void *f_name) {
 	/* We first kill the current context */
 	process_cleanup ();
 
+	//* process_cleanup에서 SPT의 buckets가 free 되어서 load에서 SPT에 페이지를 못넣음. 초기화 필요
+	supplemental_page_table_init(&thread_current()->spt);
+
 	/* And then load the binary */
 	bool success = load (file_name, &_if);
 	palloc_free_page(file_name);
@@ -892,6 +895,8 @@ install_page (void *upage, void *kpage, bool writable) {
 
 
 
+
+
 /*
 # PARAM
 # 	page = 지금 초기화 할 페이지
@@ -903,7 +908,7 @@ static bool
 lazy_load_segment (struct page *page, void *aux) {
 
 	//# 1. aux를 struct load_aux *로 변환
-	struct load_aux* la = (struct load_aux*) aux;
+	struct load_aux* la = aux;
 
 	/* 
 	# 2. offset에서 page_read_byres만큼 읽어서 페이지 기록
@@ -912,17 +917,25 @@ lazy_load_segment (struct page *page, void *aux) {
 	# 		la->page_read_bytes = 파일에서 얼만큼 읽어야 하는지
 	# 실패여부 확인 : 읽은 바이트 수가 실제 page_read_bytes와 일치하지 않으면 실패
 	*/
-	if (file_read_at(la->file, page->frame->kva, la->page_read_bytes, la->ofs) != la->page_read_bytes) {
-		goto err;
-	}
+	bool lock_held = !lock_held_by_current_thread(&file_lock);
+	if (lock_held) {
+		lock_acquire(&file_lock);
+	} 
+	bool success = file_read_at(la->file, page->frame->kva, la->page_read_bytes, la->ofs) != la->page_read_bytes;
 
 	//# 3. 읽은 데이터 뒤에 page_zero_bytes만큼 0으로 초기화
 	//# uint8_t *: 1바이트짜리 데이터를 가리키는 포인터
-	void *dst = ((uint8_t *)(page->frame->kva)) + la->page_read_bytes;
-	memset(dst, 0, la->page_zero_bytes);
+	if (success) {
+		memset ((uint8_t *) page->frame->kva + la->page_read_bytes, 0, la->page_zero_bytes);
+	}	
 
 	//# 4. 자원정리 (load_aux 해제하고 file 닫기) 및 성공 반환
 	file_close(la->file);
+
+	if (lock_held) {
+		lock_release(&file_lock);
+	}
+
 	free(la);
 	return true;	
 
@@ -932,16 +945,6 @@ lazy_load_segment (struct page *page, void *aux) {
 		free(la);
 		return false;
 }
-
-
-//# lazy_load_segment 함수 전달용
-struct load_aux {
-	struct file *file;
-	off_t ofs;
-	uint32_t page_read_bytes;
-	uint32_t page_zero_bytes;
-};
-
 
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -984,10 +987,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage, uint32_t read_bytes,
 		load_aux->ofs = ofs;
 		load_aux->page_read_bytes = page_read_bytes; 
 		load_aux->page_zero_bytes = page_zero_bytes;
-		void *aux = (void *)load_aux;
 
-		if (!vm_alloc_page_with_initializer (VM_ANON, upage, writable, lazy_load_segment, aux)) {
-			file_close(file);	//# load_aux->file에 넣으려고 file_reopen 호출한거 닫아야함
+		if (!vm_alloc_page_with_initializer (VM_ANON, upage, writable, lazy_load_segment, load_aux)) {
+			file_close(load_aux->file);	//# load_aux->file에 넣으려고 file_reopen 호출한거 닫아야함
 			goto err;
 		}
 		
@@ -1002,10 +1004,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage, uint32_t read_bytes,
 		free(load_aux);
 		return false;
 }
-
-
-
-
 
 
 
@@ -1039,7 +1037,7 @@ setup_stack (struct intr_frame *if_) {
 
 	//# 4. claim : SPT에 등록되었는지 확인하고 프레임 구해서 페이지랑 연결하고 pml4 등록
 	if (!vm_claim_page(stack_bottom)) {
-		spt_remove_page(&thread_current()->spt, &stack_page);
+		spt_remove_page(&thread_current()->spt, stack_page);
 		return false;
 	}
 
