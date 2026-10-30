@@ -179,7 +179,7 @@ vm_get_frame (void) {
 /* stack growth helper */
 #define STACK_LIMIT (1 << 20) /* 스택최대크기 = 1MB */
 
-bool
+static bool
 vm_is_stack_growth (void *addr, uintptr_t rsp) {
     uintptr_t addr_val = (uintptr_t)addr;
 
@@ -193,7 +193,7 @@ vm_is_stack_growth (void *addr, uintptr_t rsp) {
 }
 
 /* Growing the stack. */
-bool
+static bool
 vm_stack_growth (void *addr) {
     void *stack_bottom = pg_round_down (addr);
 
