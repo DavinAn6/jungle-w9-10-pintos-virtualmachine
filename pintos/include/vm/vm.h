@@ -120,6 +120,8 @@ bool
 vm_try_handle_fault (struct intr_frame *f, void *addr, bool user, bool write, bool not_present);
 bool
 vm_is_stack_growth (void *addr, uintptr_t rsp);
+bool
+vm_stack_growth (void *addr);
 
 #define vm_alloc_page(type, upage, writable)                                                       \
     vm_alloc_page_with_initializer ((type), (upage), (writable), NULL, NULL)

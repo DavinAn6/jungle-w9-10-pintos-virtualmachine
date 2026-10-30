@@ -193,7 +193,7 @@ vm_is_stack_growth (void *addr, uintptr_t rsp) {
 }
 
 /* Growing the stack. */
-static bool
+bool
 vm_stack_growth (void *addr) {
     void *stack_bottom = pg_round_down (addr);
 

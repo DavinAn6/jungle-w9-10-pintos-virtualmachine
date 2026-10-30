@@ -77,7 +77,10 @@ claim_page_if_needed (void *addr) {
                 exit (-1);
             }
         } else {
-            exit (-1);
+            if (!vm_is_stack_growth (addr, thread_current ()->user_rsp) ||
+                !vm_stack_growth (addr)) {
+                exit (-1);
+            }
         }
     }
 }
