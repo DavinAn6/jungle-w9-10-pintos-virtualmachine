@@ -98,6 +98,8 @@ do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offse
     size_t read_bytes = length < file_remaining ? length : file_remaining;
     size_t zero_bytes = ROUND_UP (length, PGSIZE) - read_bytes;
 
+    void *end_addr = (uint8_t *)start_addr + read_bytes + zero_bytes;
+
     struct lazy_load_info *info = NULL;
 
     while (read_bytes > 0 || zero_bytes > 0) {

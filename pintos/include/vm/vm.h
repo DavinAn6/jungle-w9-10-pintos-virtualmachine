@@ -35,7 +35,7 @@ enum vm_type {
 struct page_operations;
 struct thread;
 
-#define VM_TYPE(type) ((type)&7)
+#define VM_TYPE(type) ((type) & 7)
 
 /* The representation of "page".
  * This is kind of "parent class", which has four "child class"es, which are
@@ -97,6 +97,7 @@ struct lazy_load_info {
     off_t ofs;
     uint32_t page_read_bytes;
     uint32_t page_zero_bytes;
+    void *end_addr;
 };
 
 #include "threads/thread.h"

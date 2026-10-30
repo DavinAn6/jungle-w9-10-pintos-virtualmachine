@@ -10,6 +10,7 @@ struct file_page {
     struct file *file;
     off_t ofs;
     uint32_t page_read_bytes;
+    void *end_addr;
 };
 
 void
