@@ -3,6 +3,7 @@
 #include "vm/vm.h"
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
+#include "threads/mmu.h"
 #include <string.h>
 #include <round.h>
 
@@ -51,7 +52,22 @@ file_backed_swap_out (struct page *page) {
 /* Destory the file backed page. PAGE will be freed by the caller. */
 static void
 file_backed_destroy (struct page *page) {
-    struct file_page *file_page UNUSED = &page->file;
+    struct file_page *file_page = &page->file;
+
+    if (page->frame == NULL) {
+        return;
+    }
+
+    if (pml4_is_dirty (thread_current ()->pml4, page->va)) {
+        file_write_at (file_page->file,
+                       page->frame->kva,
+                       file_page->page_read_bytes,
+                       file_page->ofs);
+    }
+
+    pml4_clear_page (thread_current ()->pml4, page->va);
+    palloc_free_page (page->frame->kva);
+    free (page->frame);
 }
 
 /* do_mmap helper function */
