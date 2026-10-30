@@ -176,6 +176,22 @@ vm_get_frame (void) {
     return frame;
 }
 
+/* stack growth helper */
+#define STACK_LIMIT (1 << 20) /* 스택최대크기 = 1MB */
+
+bool
+vm_is_stack_growth (void *addr, uintptr_t rsp) {
+    uintptr_t addr_val = (uintptr_t)addr;
+
+    if (addr_val < USER_STACK - STACK_LIMIT || addr_val >= USER_STACK) {
+        return false;
+    }
+    if (addr_val < rsp - 8) {
+        return false;
+    }
+    return true;
+}
+
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {}
