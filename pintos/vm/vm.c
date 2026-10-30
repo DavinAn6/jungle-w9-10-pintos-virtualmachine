@@ -176,9 +176,6 @@ vm_get_frame (void) {
     return frame;
 }
 
-/* Growing the stack. */
-static void
-vm_stack_growth (void *addr UNUSED) {}
 static bool
 vm_stack_growth (void *addr) {
     void *va = pg_round_down (addr);
@@ -209,16 +206,6 @@ is_valid_stack_access (void *addr, void *rsp) {
 /* fault가 발생한 주소가 lazy page인지 판단하고, 해당 page를 claim 하는 것 */
 /* Return true on success */
 bool
-vm_try_handle_fault (
-    struct intr_frame *f UNUSED, void *addr, bool user UNUSED, bool write, bool not_present) {
-    struct supplemental_page_table *spt = &thread_current ()->spt;
-    struct page *page = NULL;
-    /* TODO: Validate the fault */
-    if (addr == NULL || is_kernel_vaddr (addr)) {
-        return false;
-    }
-
-    if (not_present == false) {
 vm_try_handle_fault (struct intr_frame *f, void *addr, bool user, bool write, bool not_present) {
     if (addr == NULL || is_kernel_vaddr (addr) || not_present == false) {
         return false;
@@ -229,7 +216,6 @@ vm_try_handle_fault (struct intr_frame *f, void *addr, bool user, bool write, bo
     void *rsp = user ? f->rsp : thread_current ()->user_rsp;
     page = spt_find_page (spt, addr);
     if (page == NULL) {
-        return false;
         return (is_valid_stack_access (addr, rsp) && vm_stack_growth (addr));
     }
 
