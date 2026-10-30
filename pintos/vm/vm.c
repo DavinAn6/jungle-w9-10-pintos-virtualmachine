@@ -184,6 +184,16 @@ vm_stack_growth (void *addr UNUSED) {}
 static bool
 vm_handle_wp (struct page *page UNUSED) {}
 
+static bool
+is_valid_stack_access (void *addr, void *rsp) {
+    if ((((uint8_t *)USER_STACK) > ((uint8_t *)addr)) &&
+        (((uint8_t *)USER_STACK) - ((uint8_t *)addr)) < ONE_MB &&
+        (((uint8_t *)addr) >= ((uint8_t *)rsp - 8))) {
+        return true;
+    }
+
+    return false;
+}
 /* fault가 발생한 주소가 lazy page인지 판단하고, 해당 page를 claim 하는 것 */
 /* Return true on success */
 bool
