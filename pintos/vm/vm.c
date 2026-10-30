@@ -176,9 +176,30 @@ vm_get_frame (void) {
     return frame;
 }
 
+/* stack growth helper */
+#define STACK_LIMIT (1 << 20) /* 스택최대크기 = 1MB */
+
+static bool
+vm_is_stack_growth (void *addr, uintptr_t rsp) {
+    uintptr_t addr_val = (uintptr_t)addr;
+
+    if (addr_val < USER_STACK - STACK_LIMIT || addr_val >= USER_STACK) {
+        return false;
+    }
+    if (addr_val < rsp - 8) {
+        return false;
+    }
+    return true;
+}
+
 /* Growing the stack. */
-static void
-vm_stack_growth (void *addr UNUSED) {}
+static bool
+vm_stack_growth (void *addr) {
+    void *stack_bottom = pg_round_down (addr);
+
+    return vm_alloc_page (VM_ANON | VM_MARKER_0, stack_bottom, true) &&
+           vm_claim_page (stack_bottom);
+}
 
 /* Handle the fault on write_protected page */
 static bool
@@ -187,8 +208,7 @@ vm_handle_wp (struct page *page UNUSED) {}
 /* fault가 발생한 주소가 lazy page인지 판단하고, 해당 page를 claim 하는 것 */
 /* Return true on success */
 bool
-vm_try_handle_fault (
-    struct intr_frame *f UNUSED, void *addr, bool user UNUSED, bool write, bool not_present) {
+vm_try_handle_fault (struct intr_frame *f, void *addr, bool user, bool write, bool not_present) {
     struct supplemental_page_table *spt = &thread_current ()->spt;
     struct page *page = NULL;
     /* TODO: Validate the fault */
@@ -202,6 +222,10 @@ vm_try_handle_fault (
 
     page = spt_find_page (spt, addr);
     if (page == NULL) {
+        uintptr_t rsp = user ? f->rsp : thread_current ()->user_rsp;
+        if (vm_is_stack_growth (addr, rsp)) {
+            return vm_stack_growth (addr);
+        }
         return false;
     }
 

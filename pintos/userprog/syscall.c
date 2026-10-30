@@ -77,7 +77,9 @@ claim_page_if_needed (void *addr) {
                 exit (-1);
             }
         } else {
-            exit (-1);
+            if (!vm_try_handle_fault (NULL, addr, false, false, true)) {
+                exit (-1);
+            }
         }
     }
 }
@@ -336,7 +338,8 @@ close (int fd) {
 
 /* The main system call interface */
 void
-syscall_handler (struct intr_frame *f UNUSED) {
+syscall_handler (struct intr_frame *f) {
+    thread_current ()->user_rsp = f->rsp; /* 유저rsp를 thread에 저장 */
     int syscall_num = f->R.rax;
 
     switch (syscall_num) {
