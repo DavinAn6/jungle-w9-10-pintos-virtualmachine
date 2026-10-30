@@ -197,12 +197,18 @@ vm_try_handle_fault (
     }
 
     if (not_present == false) {
+vm_try_handle_fault (struct intr_frame *f, void *addr, bool user, bool write, bool not_present) {
+    if (addr == NULL || is_kernel_vaddr (addr) || not_present == false) {
         return false;
     }
 
+    struct supplemental_page_table *spt = &thread_current ()->spt;
+    struct page *page = NULL;
+    void *rsp = user ? f->rsp : thread_current ()->user_rsp;
     page = spt_find_page (spt, addr);
     if (page == NULL) {
         return false;
+        return (is_valid_stack_access (addr, rsp) && vm_stack_growth (addr));
     }
 
     if (write && !page->writable) {
