@@ -179,6 +179,18 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {}
+static bool
+vm_stack_growth (void *addr) {
+    void *va = pg_round_down (addr);
+    if (!vm_alloc_page (VM_ANON, va, true)) {
+        return false;
+    }
+    if (!vm_claim_page (va)) {
+        spt_remove_page (&thread_current ()->spt, spt_find_page (&thread_current ()->spt, va));
+        return false;
+    }
+    return true;
+}
 
 /* Handle the fault on write_protected page */
 static bool
