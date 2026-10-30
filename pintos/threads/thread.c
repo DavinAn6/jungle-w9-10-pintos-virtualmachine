@@ -463,6 +463,7 @@ init_thread (struct thread *t, const char *name, int priority) {
     t->waiting_lock = NULL;
     t->wakeup_time = 0;
     t->magic = THREAD_MAGIC;
+    t->user_rsp = NULL;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
