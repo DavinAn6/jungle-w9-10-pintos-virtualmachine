@@ -168,4 +168,41 @@ do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offse
 
 /* Do the munmap */
 void
-do_munmap (void *addr) {}
+do_munmap (void *addr) {
+    struct page *page;
+    struct file *mmap_file;
+    void *end_addr;
+    page = spt_find_page (&thread_current ()->spt, addr);
+
+    if (page == NULL) {
+        return;
+    }
+
+    if (page->operations->type == VM_UNINIT) {
+        if (page->uninit.type != VM_FILE) {
+            return;
+        }
+        struct lazy_load_info *mmap_info = page->uninit.aux;
+
+        mmap_file = mmap_info->file;
+        end_addr = mmap_info->end_addr;
+    }
+
+    else if (page->operations->type == VM_FILE) {
+        mmap_file = page->file.file;
+        end_addr = page->file.end_addr;
+    }
+
+    else {
+        return;
+    }
+
+    for (uint8_t *remove_addr = addr; remove_addr < (uint8_t *)end_addr; remove_addr += PGSIZE) {
+        struct page *found_page = spt_find_page (&thread_current ()->spt, remove_addr);
+        if (found_page == NULL) {
+            break;
+        }
+        spt_remove_page (&thread_current ()->spt, found_page);
+    }
+    file_close (mmap_file);
+}
