@@ -28,6 +28,8 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
     page->operations = &file_ops;
 
     struct file_page *file_page = &page->file;
+
+    return true;
 }
 
 /* Swap in the page by read contents from the file. */
@@ -46,6 +48,32 @@ file_backed_swap_out (struct page *page) {
 static void
 file_backed_destroy (struct page *page) {
     struct file_page *file_page UNUSED = &page->file;
+}
+
+/* do_mmap helper function */
+static bool
+lazy_load_mmap (struct page *page, void *aux) {
+    struct lazy_load_info *file_info = aux;
+
+    page->file.file = file_info->file;
+    page->file.ofs = file_info->ofs;
+    page->file.page_read_bytes = file_info->page_read_bytes;
+
+    off_t bytes_read = file_read_at (page->file.file,
+                                     page->frame->kva,
+                                     page->file.page_read_bytes,
+                                     page->file.ofs);
+
+    if (bytes_read != page->file.page_read_bytes) {
+        free (file_info);
+        return false;
+    }
+    memset ((uint8_t *)page->frame->kva + file_info->page_read_bytes,
+            0,
+            file_info->page_zero_bytes);
+
+    free (file_info);
+    return true;
 }
 
 /* Do the mmap */
