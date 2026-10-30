@@ -193,8 +193,13 @@ vm_is_stack_growth (void *addr, uintptr_t rsp) {
 }
 
 /* Growing the stack. */
-static void
-vm_stack_growth (void *addr UNUSED) {}
+static bool
+vm_stack_growth (void *addr) {
+    void *stack_bottom = pg_round_down (addr);
+
+    return vm_alloc_page (VM_ANON | VM_MARKER_0, stack_bottom, true) &&
+           vm_claim_page (stack_bottom);
+}
 
 /* Handle the fault on write_protected page */
 static bool
