@@ -336,7 +336,8 @@ close (int fd) {
 
 /* The main system call interface */
 void
-syscall_handler (struct intr_frame *f UNUSED) {
+syscall_handler (struct intr_frame *f) {
+    thread_current ()->user_rsp = f->rsp; /* 유저rsp를 thread에 저장 */
     int syscall_num = f->R.rax;
 
     switch (syscall_num) {
