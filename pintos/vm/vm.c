@@ -218,11 +218,9 @@ vm_try_handle_fault (struct intr_frame *f, void *addr, bool user, bool write, bo
     if (page == NULL) {
         return (is_valid_stack_access (addr, rsp) && vm_stack_growth (addr));
     }
-
     if (write && !page->writable) {
         return false;
     }
-
     return vm_do_claim_page (page);
 }
 
@@ -238,7 +236,6 @@ vm_dealloc_page (struct page *page) {
 bool
 vm_claim_page (void *va) {
     struct page *page = NULL;
-    /* TODO: Fill this function */
     page = spt_find_page (&thread_current ()->spt, va);
     if (page == NULL) {
         return false;

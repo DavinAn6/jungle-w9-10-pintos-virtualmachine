@@ -35,7 +35,7 @@ enum vm_type {
 struct page_operations;
 struct thread;
 
-#define VM_TYPE(type) ((type)&7)
+#define VM_TYPE(type) ((type) & 7)
 
 /* The representation of "page".
  * This is kind of "parent class", which has four "child class"es, which are
@@ -116,6 +116,7 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page);
 
 void
 vm_init (void);
+
 bool
 vm_try_handle_fault (struct intr_frame *f, void *addr, bool user, bool write, bool not_present);
 

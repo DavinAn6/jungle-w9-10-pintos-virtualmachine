@@ -22,7 +22,7 @@
 #define ONE_MB (1 << 20)                 // 1MB
 
 /* Offset within a page. */
-#define pg_ofs(va) ((uint64_t)(va)&PGMASK)
+#define pg_ofs(va) ((uint64_t)(va) & PGMASK)
 
 #define pg_no(va) ((uint64_t)(va) >> PGBITS)
 

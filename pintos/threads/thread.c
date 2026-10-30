@@ -661,7 +661,7 @@ cmp_donation_priority (const struct list_elem *a, const struct list_elem *b, voi
     return thread_a->priority > thread_b->priority;
 }
 
-/* 
+/*
 # Helper method : recalculates current thread's effective priority from donation list and original priority
 #      	if donation_list is empty = original_priority
 #      	if donation_list not empty = max(original_priority, max priority in donation_list)
