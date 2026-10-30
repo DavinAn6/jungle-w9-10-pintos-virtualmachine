@@ -208,8 +208,7 @@ vm_handle_wp (struct page *page UNUSED) {}
 /* fault가 발생한 주소가 lazy page인지 판단하고, 해당 page를 claim 하는 것 */
 /* Return true on success */
 bool
-vm_try_handle_fault (
-    struct intr_frame *f UNUSED, void *addr, bool user UNUSED, bool write, bool not_present) {
+vm_try_handle_fault (struct intr_frame *f, void *addr, bool user, bool write, bool not_present) {
     struct supplemental_page_table *spt = &thread_current ()->spt;
     struct page *page = NULL;
     /* TODO: Validate the fault */
@@ -223,6 +222,10 @@ vm_try_handle_fault (
 
     page = spt_find_page (spt, addr);
     if (page == NULL) {
+        uintptr_t rsp = user ? f->rsp : thread_current ()->user_rsp;
+        if (vm_is_stack_growth (addr, rsp)) {
+            return vm_stack_growth (addr);
+        }
         return false;
     }
 
