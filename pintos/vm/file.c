@@ -62,6 +62,7 @@ lazy_load_mmap (struct page *page, void *aux) {
     page->file.file = file_info->file;
     page->file.ofs = file_info->ofs;
     page->file.page_read_bytes = file_info->page_read_bytes;
+    page->file.end_addr = file_info->end_addr;
 
     off_t bytes_read = file_read_at (page->file.file,
                                      page->frame->kva,
@@ -125,6 +126,7 @@ do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offse
         info->ofs = offset;
         info->page_read_bytes = page_read_bytes;
         info->page_zero_bytes = page_zero_bytes;
+        info->end_addr = end_addr;
 
         if (!vm_alloc_page_with_initializer (VM_FILE, addr, writable, lazy_load_mmap, aux)) {
             free (info);

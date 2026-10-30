@@ -979,6 +979,7 @@ load_segment (struct file *file,
         }
         void *aux = info;
 
+        info->end_addr = NULL;
         info->file = file;
         info->ofs = ofs;
         info->page_read_bytes = page_read_bytes;

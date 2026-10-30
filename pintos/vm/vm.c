@@ -309,6 +309,7 @@ copy_uninit_page (struct page *src_page) {
     dst_info->ofs = src_info->ofs;
     dst_info->page_read_bytes = src_info->page_read_bytes;
     dst_info->page_zero_bytes = src_info->page_zero_bytes;
+    dst_info->end_addr = src_info->end_addr;
 
     if (!vm_alloc_page_with_initializer (src_page->uninit.type,
                                          src_page->va,
