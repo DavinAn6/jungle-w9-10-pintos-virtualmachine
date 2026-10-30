@@ -114,6 +114,8 @@ struct thread {
     struct file **file_p;  // 파일 포인터
     struct file *file_run; // 실행 파일 포인터
 
+    void *user_rsp; // 커널모드로 진입할 때 유저스택 포인터를 저장하는 용도
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint64_t *pml4; /* Page map level 4 */
