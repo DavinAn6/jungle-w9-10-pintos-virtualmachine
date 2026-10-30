@@ -339,6 +339,7 @@ close (int fd) {
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
+    thread_current ()->user_rsp = f->rsp;
     int syscall_num = f->R.rax;
 
     switch (syscall_num) {
