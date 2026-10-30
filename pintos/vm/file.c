@@ -1,6 +1,10 @@
 /* file.c: Implementation of memory backed file object (mmaped object). */
 
 #include "vm/vm.h"
+#include "threads/malloc.h"
+#include "threads/vaddr.h"
+#include <string.h>
+#include <round.h>
 
 static bool
 file_backed_swap_in (struct page *page, void *kva);
@@ -78,7 +82,69 @@ lazy_load_mmap (struct page *page, void *aux) {
 
 /* Do the mmap */
 void *
-do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offset) {}
+do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offset) {
+    void *start_addr = addr;
+    struct file *mmap_file = file_reopen (file);
+    if (mmap_file == NULL) {
+        return NULL;
+    }
+
+    off_t file_remaining = file_length (mmap_file) - offset;
+    if (file_remaining <= 0) {
+        file_close (mmap_file);
+        return NULL;
+    }
+
+    size_t read_bytes = length < file_remaining ? length : file_remaining;
+    size_t zero_bytes = ROUND_UP (length, PGSIZE) - read_bytes;
+
+    struct lazy_load_info *info = NULL;
+
+    while (read_bytes > 0 || zero_bytes > 0) {
+        size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+        size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+        info = malloc (sizeof (*info));
+        if (info == NULL) {
+            for (uint8_t *remove_addr = start_addr; remove_addr < (uint8_t *)addr;
+                 remove_addr += PGSIZE) {
+                struct page *found_page = spt_find_page (&thread_current ()->spt, remove_addr);
+                if (found_page == NULL) {
+                    break;
+                }
+                spt_remove_page (&thread_current ()->spt, found_page);
+            }
+            file_close (mmap_file);
+            return NULL;
+        }
+        void *aux = info;
+
+        info->file = mmap_file;
+        info->ofs = offset;
+        info->page_read_bytes = page_read_bytes;
+        info->page_zero_bytes = page_zero_bytes;
+
+        if (!vm_alloc_page_with_initializer (VM_FILE, addr, writable, lazy_load_mmap, aux)) {
+            free (info);
+            for (uint8_t *remove_addr = start_addr; remove_addr < (uint8_t *)addr;
+                 remove_addr += PGSIZE) {
+                struct page *found_page = spt_find_page (&thread_current ()->spt, remove_addr);
+                if (found_page == NULL) {
+                    break;
+                }
+                spt_remove_page (&thread_current ()->spt, found_page);
+            }
+            file_close (mmap_file);
+            return NULL;
+        }
+
+        read_bytes -= page_read_bytes;
+        zero_bytes -= page_zero_bytes;
+        addr = (uint8_t *)addr + PGSIZE;
+        offset += (off_t)page_read_bytes;
+    }
+    return start_addr;
+}
 
 /* Do the munmap */
 void
