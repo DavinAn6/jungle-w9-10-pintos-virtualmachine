@@ -70,7 +70,7 @@ file_backed_destroy (struct page *page) {
     free (page->frame);
 }
 
-/* do_mmap helper function */
+/* do_mmap helper functions */
 static bool
 lazy_load_mmap (struct page *page, void *aux) {
     struct lazy_load_info *file_info = aux;
@@ -97,18 +97,63 @@ lazy_load_mmap (struct page *page, void *aux) {
     return true;
 }
 
-/* Do the mmap */
-void *
-do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offset) {
+static bool
+is_valid_mmap_request (void *addr, size_t length, off_t offset) {
     if (addr == NULL || pg_ofs (addr) != 0) {
-        return NULL;
+        return false;
     }
 
     if (length == 0) {
-        return NULL;
+        return false;
     }
 
     if (offset % PGSIZE != 0 || offset < 0) {
+        return false;
+    }
+    return true;
+}
+
+static void
+remove_mmap_pages (void *start_addr, void *addr) {
+    for (uint8_t *remove_addr = start_addr; remove_addr < (uint8_t *)addr; remove_addr += PGSIZE) {
+        struct page *found_page = spt_find_page (&thread_current ()->spt, remove_addr);
+        if (found_page == NULL) {
+            break;
+        }
+        spt_remove_page (&thread_current ()->spt, found_page);
+    }
+}
+
+static bool
+register_mmap_page (void *addr,
+                    int writable,
+                    struct file *mmap_file,
+                    off_t offset,
+                    size_t page_read_bytes,
+                    size_t page_zero_bytes,
+                    void *end_addr) {
+    struct lazy_load_info *info = malloc (sizeof (*info));
+    if (info == NULL) {
+        return false;
+    }
+
+    info->file = mmap_file;
+    info->ofs = offset;
+    info->page_read_bytes = page_read_bytes;
+    info->page_zero_bytes = page_zero_bytes;
+    info->end_addr = end_addr;
+
+    if (!vm_alloc_page_with_initializer (VM_FILE, addr, writable, lazy_load_mmap, info)) {
+        free (info);
+        return false;
+    }
+    return true;
+}
+
+/* Do the mmap */
+void *
+do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offset) {
+    if (!is_valid_mmap_request (addr, length, offset)) {
         return NULL;
     }
 
@@ -135,43 +180,13 @@ do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offse
         return NULL;
     }
 
-    struct lazy_load_info *info = NULL;
-
     while (read_bytes > 0 || zero_bytes > 0) {
         size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-        info = malloc (sizeof (*info));
-        if (info == NULL) {
-            for (uint8_t *remove_addr = start_addr; remove_addr < (uint8_t *)addr;
-                 remove_addr += PGSIZE) {
-                struct page *found_page = spt_find_page (&thread_current ()->spt, remove_addr);
-                if (found_page == NULL) {
-                    break;
-                }
-                spt_remove_page (&thread_current ()->spt, found_page);
-            }
-            file_close (mmap_file);
-            return NULL;
-        }
-        void *aux = info;
-
-        info->file = mmap_file;
-        info->ofs = offset;
-        info->page_read_bytes = page_read_bytes;
-        info->page_zero_bytes = page_zero_bytes;
-        info->end_addr = end_addr;
-
-        if (!vm_alloc_page_with_initializer (VM_FILE, addr, writable, lazy_load_mmap, aux)) {
-            free (info);
-            for (uint8_t *remove_addr = start_addr; remove_addr < (uint8_t *)addr;
-                 remove_addr += PGSIZE) {
-                struct page *found_page = spt_find_page (&thread_current ()->spt, remove_addr);
-                if (found_page == NULL) {
-                    break;
-                }
-                spt_remove_page (&thread_current ()->spt, found_page);
-            }
+        if (!register_mmap_page (
+                addr, writable, mmap_file, offset, page_read_bytes, page_zero_bytes, end_addr)) {
+            remove_mmap_pages (start_addr, addr);
             file_close (mmap_file);
             return NULL;
         }
