@@ -100,6 +100,18 @@ lazy_load_mmap (struct page *page, void *aux) {
 /* Do the mmap */
 void *
 do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offset) {
+    if (addr == NULL || pg_ofs (addr) != 0) {
+        return NULL;
+    }
+
+    if (length == 0) {
+        return NULL;
+    }
+
+    if (offset % PGSIZE != 0 || offset < 0) {
+        return NULL;
+    }
+
     void *start_addr = addr;
     struct file *mmap_file = file_reopen (file);
     if (mmap_file == NULL) {
@@ -116,6 +128,12 @@ do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offse
     size_t zero_bytes = ROUND_UP (length, PGSIZE) - read_bytes;
 
     void *end_addr = (uint8_t *)start_addr + read_bytes + zero_bytes;
+
+    if (!is_user_vaddr (start_addr) || !is_user_vaddr ((uint8_t *)(end_addr)-1) ||
+        start_addr >= end_addr) {
+        file_close (mmap_file);
+        return NULL;
+    }
 
     struct lazy_load_info *info = NULL;
 
