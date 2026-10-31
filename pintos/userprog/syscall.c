@@ -336,6 +336,20 @@ close (int fd) {
     t->file_p[fd] = NULL;
 }
 
+/* do_mmap helper function */
+static void *
+mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
+    if (fd < FD_START) {
+        return NULL;
+    }
+
+    if (thread_current ()->file_p[fd] == NULL) {
+        return NULL;
+    }
+
+    return do_mmap (addr, length, writable, thread_current ()->file_p[fd], offset);
+}
+
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f) {
@@ -384,6 +398,12 @@ syscall_handler (struct intr_frame *f) {
         break;
     case SYS_CLOSE:
         close (f->R.rdi);
+        break;
+    case SYS_MMAP:
+        f->R.rax = mmap (f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+        break;
+    case SYS_MUNMAP:
+        do_munmap (f->R.rdi);
         break;
     }
 }
